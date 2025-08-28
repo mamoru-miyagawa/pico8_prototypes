@@ -1,23 +1,74 @@
-# My PICO-8 Games 🎮
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PICO-8 Prototypes</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background: #fafafa;
+      color: #222;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      padding: 40px;
+      text-align: center;
+    }
+    h1 {
+      font-weight: 300;
+      margin-bottom: 10px;
+      font-size: 2.2em;
+    }
+    p {
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 1.1em;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin: 15px 0;
+    }
+    a {
+      text-decoration: none;
+      color: #0055ff;
+      font-size: 1.2em;
+      border-bottom: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    a:hover {
+      color: #000;
+      border-color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PICO-8 Prototypes</h1>
+    <p>A small collection of experimental games.</p>
+    <ul id="game-list"></ul>
+  </div>
 
-This is a collection of small games I made using [PICO-8](https://www.lexaloffle.com/pico-8.php).
+  <script>
+    // 👇 Add games here as you create new folders
+    const games = [
+      { name: "Sauna", folder: "sauna" }
+    ];
 
-👉 **Play them here:** [https://mamoru-miyagawa.github.io/pico8_prototypes/](https://mamoru-miyagawa.github.io/pico8_prototypes/)
-
-## Games Included
-- **Sauna Prototype** – Heatbar prototype (folder: `sauna/`)
-<!-- - **Game 2** – A puzzle experiment (folder: `game2/`)
-- **Game 3** – A space shooter (folder: `game3/`) -->
-
-## How it works
-Each game is exported from PICO-8 as HTML and lives in its own folder.  
-GitHub Pages hosts them automatically.
-
-## Controls
-PICO-8 default controls:
-- Arrow keys = movement
-- Z / X = action buttons
-- Enter = pause menu
-
----
-✨ Enjoy playing!
+    const list = document.getElementById("game-list");
+    games.forEach(game => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="${game.folder}/" target="_blank">${game.name}</a>`;
+      list.appendChild(li);
+    });
+  </script>
+</body>
+</html>
