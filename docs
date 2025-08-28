@@ -1,1 +1,14 @@
-
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My PICO-8 Games</title>
+</head>
+<body>
+  <h1>My PICO-8 Games Collection</h1>
+  <ul>
+    <li><a href="sauna/">Play Game 1</a></li>
+<!--   <li><a href="game2/">Play Game 2</a></li>
+       <li><a href="game3/">Play Game 3</a></li> -->
+  </ul>
+</body>
+</html>
