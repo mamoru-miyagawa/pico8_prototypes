@@ -2,16 +2,16 @@ pico-8 cartridge // http://www.pico-8.com
 version 41
 __lua__
 -- pico-8 game prototype
--- implements a blue station that gives xp over time, two red stations that give xp on interaction,
--- and a new green station that also gives xp over time.
--- adds a new "bonus time" mechanic for bonus xp.
+-- implements a "bonus time" mechanic per station type.
+-- blue and green stations give xp over time.
+-- two red stations give xp on button interaction.
 
 -- constants
 local tile_size = 8
-local exp_blue_station = 12
-local exp_red_station = 7
-local exp_green_station = 6 -- new xp value for the green station
-local exp_gain_interval = 30 -- gain xp every 30 frames (1 second) when on blue station
+local exp_blue_station = 10
+local exp_red_station = 20
+local exp_green_station = 15 -- new xp value for the green station
+local exp_gain_interval = 30 -- gain xp every 30 frames (1 second) when on blue/green station
 local player_speed = 1 -- control the player's speed (in pixels per frame)
 
 -- blue station map details
@@ -27,6 +27,8 @@ local red_station_map_x = 4
 local red_station_map_y = 0
 local red_station_width_tiles = 2
 local red_station_height_tiles = 2
+local red_station_screen_x = 70
+local red_station_screen_y = 40
 
 -- green station map details
 local green_station_map_x = 6
@@ -67,13 +69,16 @@ local nearby_station_x = 0
 local nearby_station_y = 0
 
 -- bonus time variables
-local bonus_time_period = 30 * 2 -- a new bonus time starts every 2 seconds
+local bonus_time_period = 30 * 2 -- time between bonuses
 local bonus_duration = 30 * 7 -- bonus time lasts for 7 seconds
 local bonus_timer = bonus_time_period
 local bonus_active = false
 local bonus_duration_timer = 0
-local bonus_type = "" -- can be "blue", "red", or "green"
-local last_bonus_type = ""
+local bonus_active_station = 0 -- 0=none, 1=blue, 2=red, 3=green
+local last_bonus_station = 0
+
+-- xp multiplier display
+local xp_multiplier_text = "+0%"
 
 function _init()
 -- this function runs once when the game starts
@@ -84,6 +89,7 @@ function _update()
 
 -- reset interaction state at the start of each frame
 can_interact = false
+xp_multiplier_text = "+0%"
 
 -- check for player movement
 -- using separate `if` statements allows for diagonal movement
@@ -128,25 +134,21 @@ if (not bonus_active) then
     if (bonus_timer <= 0) then
         bonus_active = true
         bonus_duration_timer = bonus_duration
-        
-        -- create a list of possible bonus types, excluding the last one
-        local possible_types = {"blue", "red", "green"}
-        local new_possible_types = {}
-        for i = 1, #possible_types do
-            if (possible_types[i] ~= last_bonus_type) then
-                add(new_possible_types, possible_types[i])
-            end
+        -- choose a new station type for the bonus that isn't the last one
+        local stations = {1, 2, 3}
+        local chosen_station = stations[flr(rnd(3)+1)]
+        while (chosen_station == last_bonus_station) do
+            chosen_station = stations[flr(rnd(3)+1)]
         end
-        
-        -- randomly choose a bonus type from the new list
-        bonus_type = new_possible_types[flr(rnd(#new_possible_types)) + 1]
-        last_bonus_type = bonus_type
+        bonus_active_station = chosen_station
+        last_bonus_station = chosen_station
     end
 else
     bonus_duration_timer -= 1
     if (bonus_duration_timer <= 0) then
         bonus_active = false
         bonus_timer = bonus_time_period
+        bonus_active_station = 0
     end
 end
 
@@ -154,14 +156,18 @@ end
 local blue_station_right = blue_station_screen_x + (blue_station_width_tiles * tile_size)
 local blue_station_bottom = blue_station_screen_y + (blue_station_height_tiles * tile_size)
 
-if (player.x >= blue_station_screen_x) and (player.x <= blue_station_right) and
-   (player.y >= blue_station_screen_y) and (player.y <= blue_station_bottom) then
-    
+local on_blue_station = (player.x >= blue_station_screen_x) and (player.x <= blue_station_right) and
+                        (player.y >= blue_station_screen_y) and (player.y <= blue_station_bottom)
+
+if (on_blue_station) then
+    if (bonus_active and bonus_active_station == 1) then
+        xp_multiplier_text = "+30%"
+    end
     player.blue_station_timer += 1
     if (player.blue_station_timer >= exp_gain_interval) then
         local xp_gained = exp_blue_station
         local floating_text = "+" .. xp_gained .. " exp"
-        if (bonus_active and bonus_type == "blue") then
+        if (bonus_active and bonus_active_station == 1) then
             xp_gained = flr(xp_gained * 1.3)
             floating_text = "+" .. xp_gained .. " exp (bonus)"
         end
@@ -183,14 +189,18 @@ end
 local green_station_right = green_station_screen_x + (green_station_width_tiles * tile_size)
 local green_station_bottom = green_station_screen_y + (green_station_height_tiles * tile_size)
 
-if (player.x >= green_station_screen_x) and (player.x <= green_station_right) and
-   (player.y >= green_station_screen_y) and (player.y <= green_station_bottom) then
-    
+local on_green_station = (player.x >= green_station_screen_x) and (player.x <= green_station_right) and
+                         (player.y >= green_station_screen_y) and (player.y <= green_station_bottom)
+
+if (on_green_station) then
+    if (bonus_active and bonus_active_station == 3) then
+        xp_multiplier_text = "+30%"
+    end
     player.green_station_timer += 1
     if (player.green_station_timer >= exp_gain_interval) then
         local xp_gained = exp_green_station
         local floating_text = "+" .. xp_gained .. " exp"
-        if (bonus_active and bonus_type == "green") then
+        if (bonus_active and bonus_active_station == 3) then
             xp_gained = flr(xp_gained * 1.3)
             floating_text = "+" .. xp_gained .. " exp (bonus)"
         end
@@ -214,19 +224,23 @@ for i=1, #red_stations do
     local red_station_right = station.x + (red_station_width_tiles * tile_size)
     local red_station_bottom = station.y + (red_station_height_tiles * tile_size)
     
-    -- check if the player is within a close range of the station
-    if (player.x >= station.x - 4) and (player.x <= red_station_right + 4) and
-       (player.y >= station.y - 4) and (player.y <= red_station_bottom + 4) then
-        
+    local near_red_station = (player.x >= station.x - 4) and (player.x <= red_station_right + 4) and
+                             (player.y >= station.y - 4) and (player.y <= red_station_bottom + 4)
+
+    if (near_red_station) then
         can_interact = true
         nearby_station_x = station.x + (red_station_width_tiles * tile_size / 2) - 4
-        nearby_station_y = station.y - 8 + 30 -- add 30 to the y position
+        nearby_station_y = station.y - 8 + 30
+        
+        if (bonus_active and bonus_active_station == 2) then
+            xp_multiplier_text = "+30%"
+        end
         
         -- if z is pressed, interact
         if (btnp(4)) then
             local xp_gained = exp_red_station
             local floating_text = "+" .. xp_gained .. " exp"
-            if (bonus_active and bonus_type == "red") then
+            if (bonus_active and bonus_active_station == 2) then
                 xp_gained = flr(xp_gained * 1.3)
                 floating_text = "+" .. xp_gained .. " exp (bonus)"
             end
@@ -258,10 +272,7 @@ end
 
 function _draw()
 -- this function is called 30 times per second to draw graphics
-cls(1) -- clear the screen
-fillp(ˇ)
-rectfill(0,0,128,128,2)
-fillp()
+cls() -- clear the screen
 
 -- draw the map-based blue station
 map(blue_station_map_x, blue_station_map_y, blue_station_screen_x, blue_station_screen_y, blue_station_width_tiles, blue_station_height_tiles)
@@ -280,32 +291,23 @@ spr(current_sprite, player.x, player.y)
 
 -- draw bonus time highlights and text
 if (bonus_active) then
-    if (bonus_type == "blue") then
-        local x1 = blue_station_screen_x - 1
-        local y1 = blue_station_screen_y - 1
-        local x2 = blue_station_screen_x + (blue_station_width_tiles * tile_size)
-        local y2 = blue_station_screen_y + (blue_station_height_tiles * tile_size)
-        rect(x1, y1, x2, y2, 11) -- draw a light yellow outline
-        print("bonus time", blue_station_screen_x + 16, blue_station_screen_y - 8, 11)
-    elseif (bonus_type == "red") then
-        -- calculate a single rect for both stations
-        local x1 = red_stations[1].x - 1
-        local y1 = red_stations[1].y - 1
-        local x2 = red_stations[#red_stations].x + (red_station_width_tiles * tile_size)
-        local y2 = red_stations[#red_stations].y + (red_station_height_tiles * tile_size)
-        rect(x1, y1, x2, y2, 11) -- draw a light yellow outline
-        
-        -- find the center of the combined area for the text
-        local text_x = x1 + (x2 - x1)/2 - 16 -- adjust for "bonus time" text length
-        local text_y = y1 - 8
-        print("bonus time", text_x, text_y, 11)
-    elseif (bonus_type == "green") then
-        local x1 = green_station_screen_x - 1
-        local y1 = green_station_screen_y - 1
-        local x2 = green_station_screen_x + (green_station_width_tiles * tile_size)
-        local y2 = green_station_screen_y + (green_station_height_tiles * tile_size)
-        rect(x1, y1, x2, y2, 11) -- draw a light yellow outline
-        print("bonus time", green_station_screen_x + 16, green_station_screen_y - 8, 11)
+    local highlight_color = 11 -- light green
+    local text_color = 11
+
+    if (bonus_active_station == 1) then -- blue station bonus
+        rect(blue_station_screen_x-1, blue_station_screen_y-1, blue_station_screen_x + (blue_station_width_tiles*tile_size), blue_station_screen_y + (blue_station_height_tiles*tile_size), highlight_color)
+        print("bonus time", blue_station_screen_x + 1, blue_station_screen_y-8, text_color)
+    elseif (bonus_active_station == 2) then -- red station bonus
+        -- calculate single highlight for both red stations
+        local x1_red = red_stations[1].x - 1
+        local y1_red = red_stations[1].y - 1
+        local x2_red = red_stations[#red_stations].x + (red_station_width_tiles * tile_size)
+        local y2_red = red_stations[#red_stations].y + (red_station_height_tiles * tile_size)
+        rect(x1_red, y1_red, x2_red, y2_red, highlight_color)
+        print("bonus time", x1_red + 5, y1_red-8, text_color)
+    elseif (bonus_active_station == 3) then -- green station bonus
+        rect(green_station_screen_x-1, green_station_screen_y-1, green_station_screen_x + (green_station_width_tiles*tile_size), green_station_screen_y + (green_station_height_tiles*tile_size), highlight_color)
+        print("bonus time", green_station_screen_x + 1, green_station_screen_y-8, text_color)
     end
 end
 
@@ -316,11 +318,12 @@ end
 
 -- draw floating text objects
 for text in all(floating_texts) do
-    print(text.text, text.x, text.y, 10) -- use a light orange color
+    print(text.text, text.x, text.y, 10)
 end
 
 -- draw ui
 print("exp: " .. player.exp, 2, 2, 7)
+print("xp bonus: " .. xp_multiplier_text, 2, 10, 7)
 
 end
 __gfx__
