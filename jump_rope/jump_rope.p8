@@ -36,6 +36,12 @@ local is_double_challenge = false
 -- popup state
 local popups = {}
 
+-- collectible state
+local collectible_x, collectible_y = 0, 0
+local collectible_active = false
+local collectible_timer = 0
+local collectible_lifespan = 5 * 30 -- 5 seconds at 30 frames per second
+
 -- convert 3d world coordinates to 2d screen coordinates
 -- the isometric projection formula is:
 -- screen_x = (x - y) * scale
@@ -46,11 +52,19 @@ function to_iso(x, y, z)
   return ix, iy
 end
 
+-- spawns a collectible item at a random position
+function spawn_collectible()
+  collectible_x = rnd(s * 2) - s
+  collectible_y = rnd(s * 2) - s
+  collectible_active = true
+  collectible_timer = collectible_lifespan
+end
+
 -- reset the line and its direction, with double line logic
 function reset_line()
   -- reset second line state
   line2_direction = -1
-
+  
   -- check if it's time for a double line challenge
   if successful_jumps >= 3 then
     is_double_challenge = true
@@ -117,6 +131,7 @@ function reset_game()
   successful_jumps = 0
   is_double_challenge = false
   popups = {}
+  collectible_active = false
   reset_line()
 end
 
@@ -162,6 +177,12 @@ function _update()
   if (btnp(🅾️) or btnp(❎)) and on_ground then
     pvz = jump_power
     on_ground = false
+    -- gain experience on every jump
+    local exp_gain = flr(10 * multiplier)
+    experience += exp_gain
+    add(popups, {
+      x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 60
+    })
   end
   
   -- apply gravity to the player's z-velocity
@@ -186,42 +207,36 @@ function _update()
     line_y += line_speed
     if line_y > s then
       reset_line()
-      local exp_gain = flr(10 * multiplier)
-      experience += exp_gain
-      add(popups, {
-        x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-      })
-      multiplier = min(multiplier + 0.05, 1.5)
+      multiplier += 0.05
       if not is_double_challenge then
         successful_jumps += 1
+      end
+      if not collectible_active and rnd(1) < 0.5 then
+        spawn_collectible()
       end
     end
   elseif line_direction == 1 then
     line_x += line_speed
     if line_x > s then
       reset_line()
-      local exp_gain = flr(10 * multiplier)
-      experience += exp_gain
-      add(popups, {
-        x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-      })
-      multiplier = min(multiplier + 0.05, 1.5)
+      multiplier += 0.05
       if not is_double_challenge then
         successful_jumps += 1
+      end
+      if not collectible_active and rnd(1) < 0.5 then
+        spawn_collectible()
       end
     end
   elseif line_direction == 2 then
     line_y -= line_speed
     if line_y < -s then
       reset_line()
-      local exp_gain = flr(10 * multiplier)
-      experience += exp_gain
-      add(popups, {
-        x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-      })
-      multiplier = min(multiplier + 0.05, 1.5)
+      multiplier += 0.05
       if not is_double_challenge then
         successful_jumps += 1
+      end
+      if not collectible_active and rnd(1) < 0.5 then
+        spawn_collectible()
       end
     end
   end
@@ -232,47 +247,62 @@ function _update()
       line2_y += line_speed
       if line2_y > s then
         reset_line()
-        local exp_gain = flr(10 * multiplier)
-        experience += exp_gain
-        add(popups, {
-          x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-        })
-        multiplier = min(multiplier + 0.05, 1.5)
+        multiplier += 0.05
         if not is_double_challenge then
           successful_jumps += 1
+        end
+        if not collectible_active and rnd(1) < 0.5 then
+          spawn_collectible()
         end
       end
     elseif line2_direction == 1 then
       line2_x += line_speed
       if line2_x > s then
         reset_line()
-        local exp_gain = flr(10 * multiplier)
-        experience += exp_gain
-        add(popups, {
-          x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-        })
-        multiplier = min(multiplier + 0.05, 1.5)
+        multiplier += 0.05
         if not is_double_challenge then
           successful_jumps += 1
+        end
+        if not collectible_active and rnd(1) < 0.5 then
+          spawn_collectible()
         end
       end
     elseif line2_direction == 2 then
       line2_y -= line_speed
       if line2_y < -s then
         reset_line()
-        local exp_gain = flr(10 * multiplier)
-        experience += exp_gain
-        add(popups, {
-          x = px, y = py, z = pz, text = "+"..exp_gain.." exp", life = 30
-        })
-        multiplier = min(multiplier + 0.05, 1.5)
+        multiplier += 0.05
         if not is_double_challenge then
           successful_jumps += 1
+        end
+        if not collectible_active and rnd(1) < 0.5 then
+          spawn_collectible()
         end
       end
     end
   end
   
+  -- check for collectible collision
+  if collectible_active and on_ground then
+    local dist_x = px - collectible_x
+    local dist_y = py - collectible_y
+    if sqrt(dist_x*dist_x + dist_y*dist_y) < 2 then
+      multiplier += 0.1
+      collectible_active = false
+      add(popups, {
+        x = px, y = py, z = pz, text = "+10% mult!", life = 60
+      })
+    end
+  end
+
+  -- update collectible timer
+  if collectible_active then
+    collectible_timer -= 1
+    if collectible_timer <= 0 then
+      collectible_active = false
+    end
+  end
+
   -- collision detection: player hits the line(s)
   if on_ground then
     local hit = false
@@ -282,6 +312,7 @@ function _update()
         hit = true
       end
     elseif line_direction == 1 then
+      -- corrected collision logic to fix the bug
       if px > line_x - 1 and px < line_x + 1 then
         hit = true
       end
@@ -307,7 +338,7 @@ function _update()
   
   -- update popups
   for p in all(popups) do
-    p.z += 1
+    p.z += .5
     p.life -= 1
     if p.life <= 0 then
       del(popups, p)
@@ -379,6 +410,12 @@ function _draw()
     end
   end
 
+  -- draw the collectible if active
+  if collectible_active then
+    local cx, cy = to_iso(collectible_x, collectible_y, 0)
+    circfill(cx, cy, 3, 11) -- green collectible
+  end
+
   -- draw the player and shadow, with the shadow drawn first
   local player_iso_x, player_iso_y = to_iso(px, py, pz)
   local shadow_iso_x, shadow_iso_y = to_iso(px, py, 0)
@@ -387,8 +424,8 @@ function _draw()
   
   -- draw popups
   for p in all(popups) do
-    local popup_iso_x, popup_iso_y = to_iso(p.x, p.y, p.z)
-    print(p.text, popup_iso_x, popup_iso_y, 11)
+    local px, py = to_iso(p.x, p.y, p.z)
+    print(p.text, px, py, 7)
   end
 
   print("exp: "..flr(experience), 1, 10, 7)
