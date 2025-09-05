@@ -14,7 +14,10 @@ local exp_red_station = 20
 local passive_time_gain = 1 -- amount of passive time gained over time on a station
 local gain_interval = 30 -- gain passive xp or time every 30 frames (1 second) when on a station
 local player_speed = 1 -- control the player's speed (in pixels per frame)
-local max_time_for_reward = 12 -- new constant for the reward bar, now based on time
+local max_time_for_reward = 10 -- new constant for the reward bar, now based on time
+
+-- bonus timer constants
+local max_bonus_timer = 30 * 60 -- 60 seconds (1 minute)
 
 -- blue station map details
 local blue_station_map_x = 0
@@ -64,7 +67,8 @@ time = 0, -- new variable for time, which fills the bar
 anim_timer = 0,
 anim_frame = 1, -- current frame index for the animation sequence
 passive_time_timer = 0, -- combined timer for all station passive time gain
-passive_exp_timer = 0 -- new timer for passive experience gain
+passive_exp_timer = 0, -- new timer for passive experience gain
+countdown_timer = max_bonus_timer
 }
 
 -- the single animation sequence to loop through: (sprite 1, sprite 2, sprite 3, sprite 2)
@@ -148,6 +152,7 @@ end
 if (not reward_ready and player.time >= max_time_for_reward) then
     reward_ready = true
     player.time = max_time_for_reward
+    player.countdown_timer = max_bonus_timer
 end
 
 -- logic for the map-based blue station
@@ -187,10 +192,14 @@ end
 
 -- passive time gain when on any station
 if (on_blue_station or on_green_station or on_red_station) then
-    player.passive_time_timer += 1
-    if (player.passive_time_timer >= gain_interval) then
-        player.time += passive_time_gain
-        player.passive_time_timer = 0
+    if (not reward_ready) then
+        player.passive_time_timer += 1
+        if (player.passive_time_timer >= gain_interval) then
+            player.time += passive_time_gain
+            player.passive_time_timer = 0
+            -- clamp the time value so it doesn't exceed the max
+            player.time = mid(0, player.time, max_time_for_reward)
+        end
     end
 else
     player.passive_time_timer = 0 -- reset timer when not on a station
@@ -211,6 +220,16 @@ else
     player.passive_exp_timer = 0 -- reset timer when not on a blue or green station
 end
 
+-- countdown logic for the reward
+if (reward_ready) then
+    player.countdown_timer -= 1
+    if (player.countdown_timer <= 0) then
+        -- reset everything if the timer runs out
+        player.exp = 0
+        player.time = 0
+        reward_ready = false
+    end
+end
 
 -- logic for the treasure chest interaction
 local chest_right = treasure_chest_screen_x + (treasure_chest_width_tiles * tile_size)
@@ -223,10 +242,11 @@ if (near_chest and reward_ready) then
     nearby_station_x = treasure_chest_screen_x + (treasure_chest_width_tiles * tile_size / 2) - 4
     nearby_station_y = treasure_chest_screen_y - 8 + 30
     if (btnp(4)) then
-        -- give the reward and reset time and exp
+        -- give the reward and reset time and exp and countdown
         player.exp = 0
         player.time = 0
         reward_ready = false
+        player.countdown_timer = max_bonus_timer
     end
 end
 
@@ -303,6 +323,18 @@ if (reward_ready) then
     local chest_center_x = treasure_chest_screen_x + (treasure_chest_width_tiles * tile_size / 2) - 10
     local chest_bottom_y = treasure_chest_screen_y + (treasure_chest_height_tiles * tile_size) + 2
     print("claim!", chest_center_x, chest_bottom_y, 7)
+end
+
+-- draw the countdown timer
+if (reward_ready) then
+    local seconds_remaining = flr(player.countdown_timer / 30)
+    local minutes = flr(seconds_remaining / 60)
+    local seconds = seconds_remaining % 60
+    local seconds_str = tostr(seconds)
+    if (seconds < 10) then
+        seconds_str = "0" .. seconds_str
+    end
+    print(tostr(minutes) .. ":" .. seconds_str, 90, 95, 7)
 end
 
 end
