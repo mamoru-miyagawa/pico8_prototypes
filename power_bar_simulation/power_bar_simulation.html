@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strength Easing Mechanic</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Use Inter font and ensure full viewport coverage */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+        }
+        /* Custom progress bar styles */
+        .progress-bar {
+            transition: width 0.5s ease-out, background-color 0.3s;
+            height: 1.5rem;
+        }
+        /* Style for the level selector and buttons to ensure good touch target size */
+        select, button {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-xl bg-gray-800 p-8 rounded-xl shadow-2xl space-y-6 text-white border border-gray-700">
+        <h1 class="text-3xl font-bold text-center text-teal-400">Strength Augmentation System</h1>
+        <p class="text-gray-400 text-center">Simulate how raw **Performance** is boosted by the player's **Strength** stat using an easing curve.</p>
+
+        <!-- Level Selector -->
+        <div class="space-y-2">
+            <label for="level-select" class="block text-sm font-medium text-gray-300">Select Player Level:</label>
+            <select id="level-select" class="w-full bg-gray-700 text-white border-gray-600 focus:ring-teal-500 focus:border-teal-500">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <div class="text-sm text-gray-400">Strength: <span id="display-strength" class="font-bold text-teal-300">--</span></div>
+        </div>
+
+        <!-- Performance Input -->
+        <div class="space-y-2">
+            <label for="performance-slider" class="block text-sm font-medium text-gray-300">Raw Performance Input (<span id="performance-value">50</span>%)</label>
+            <input type="range" id="performance-slider" min="0" max="100" value="50" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500">
+        </div>
+
+        <!-- NEW: Quick Test Buttons -->
+        <div class="flex space-x-4 justify-center pt-2">
+            <button onclick="setPerformance(1)" class="w-full bg-red-600 hover:bg-red-700 text-white text-sm shadow-md shadow-red-500/50 transition duration-150 ease-in-out">
+                Test 1% (Min)
+            </button>
+            <button onclick="setPerformance(100)" class="w-full bg-lime-600 hover:bg-lime-700 text-white text-sm shadow-md shadow-lime-500/50 transition duration-150 ease-in-out">
+                Test 100% (Max)
+            </button>
+        </div>
+        <!-- END NEW: Quick Test Buttons -->
+
+        <!-- Easing and Stat Display -->
+        <div class="grid grid-cols-2 gap-4 text-center border-t border-gray-700 pt-6">
+            <div>
+                <p class="text-sm text-gray-400">Eased Multiplier (S^0.35)</p>
+                <p id="display-eased-strength" class="text-lg font-mono text-yellow-400">--</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-400">Total Factor (x)</p>
+                <p id="display-factor" class="text-lg font-mono text-yellow-400">--</p>
+            </div>
+        </div>
+        
+        <!-- Result Display -->
+        <div class="space-y-3 pt-4">
+            <h2 class="text-xl font-semibold">Final Result: <span id="result-value" class="text-3xl font-extrabold text-lime-400">0.00%</span></h2>
+            
+            <!-- Result Bar -->
+            <div class="w-full bg-gray-700 rounded-lg overflow-hidden">
+                <div id="result-bar" class="progress-bar bg-lime-600 text-xs font-medium text-center p-0.5 leading-none rounded-r-lg" style="width: 0%">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Formula Explanation -->
+        <div class="text-xs text-gray-500 pt-4 border-t border-gray-700">
+            <p class="font-semibold">Formula Details:</p>
+            <p>1. <code class="bg-gray-700 rounded px-1">Eased Strength = Strength ^ 0.35</code> (Smooths exponential growth)</p>
+            <p>2. <code class="bg-gray-700 rounded px-1">Factor = 1 + Eased Strength / 10</code> (Converts smoothed stat into a multiplier)</p>
+            <p>3. <code class="bg-gray-700 rounded px-1">Final Result = min(100, Performance * Factor)</code></p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Game Data ---
+        // Only using Level (L) and Strength (S) data for simplicity
+        const STRENGTH_DATA = [
+            { L: 1, S: 8 }, { L: 2, S: 9 }, { L: 3, S: 10 }, { L: 4, S: 11 }, { L: 5, S: 12 },
+            { L: 6, S: 13 }, { L: 7, S: 14 }, { L: 8, S: 16 }, { L: 9, S: 17 }, { L: 10, S: 28 },
+            { L: 11, S: 31 }, { L: 12, S: 34 }, { L: 13, S: 38 }, { L: 14, S: 41 }, { L: 15, S: 46 },
+            { L: 16, S: 50 }, { L: 17, S: 55 }, { L: 18, S: 61 }, { L: 19, S: 67 }, { L: 20, S: 110 },
+            { L: 21, S: 121 }, { L: 22, S: 133 }, { L: 23, S: 147 }, { L: 24, S: 161 }, { L: 25, S: 177 },
+            { L: 26, S: 195 }, { L: 27, S: 215 }, { L: 28, S: 236 }, { L: 29, S: 260 }, { L: 30, S: 428 },
+            { L: 31, S: 471 }, { L: 32, S: 518 }, { L: 33, S: 570 }, { L: 34, S: 627 }, { L: 35, S: 690 },
+            { L: 36, S: 759 }, { L: 37, S: 835 }, { L: 38, S: 918 }, { L: 39, S: 1010 }, { L: 40, S: 1666 },
+            { L: 41, S: 1833 }, { L: 42, S: 2016 }, { L: 43, S: 2218 }, { L: 44, S: 2440 }, { L: 45, S: 2684 },
+            { L: 46, S: 2952 }, { L: 47, S: 3247 }, { L: 48, S: 3572 }, { L: 49, S: 3929 }, { L: 50, S: 6483 },
+        ];
+
+        // --- DOM Elements ---
+        const levelSelect = document.getElementById('level-select');
+        const performanceSlider = document.getElementById('performance-slider');
+        const performanceValueDisplay = document.getElementById('performance-value');
+        const displayStrength = document.getElementById('display-strength');
+        const displayEasedStrength = document.getElementById('display-eased-strength');
+        const displayFactor = document.getElementById('display-factor');
+        const resultValueDisplay = document.getElementById('result-value');
+        const resultBar = document.getElementById('result-bar');
+
+        let currentStrength = 8; // Default to Level 1 strength
+
+        /**
+         * Populates the level selection dropdown with all available levels.
+         */
+        function populateLevels() {
+            STRENGTH_DATA.forEach(data => {
+                const option = document.createElement('option');
+                option.value = data.L;
+                option.textContent = `Level ${data.L}`;
+                levelSelect.appendChild(option);
+            });
+
+            // Set initial strength and trigger the display update
+            updateCurrentStrength();
+        }
+
+        /**
+         * Updates the current strength stat based on the selected level.
+         */
+        function updateCurrentStrength() {
+            const selectedLevel = parseInt(levelSelect.value);
+            const data = STRENGTH_DATA.find(d => d.L === selectedLevel);
+            currentStrength = data ? data.S : 8; // Fallback to level 1
+            displayStrength.textContent = currentStrength.toLocaleString();
+
+            // Run calculation immediately so Eased Strength and Factor are visible
+            calculateResult();
+        }
+
+        /**
+         * Updates the performance value display as the slider moves.
+         */
+        function updatePerformanceDisplay() {
+            performanceValueDisplay.textContent = performanceSlider.value;
+        }
+
+        /**
+         * Sets the performance slider to a specific value and recalculates the result.
+         * @param {number} value - The new performance value (0-100).
+         */
+        window.setPerformance = function(value) {
+            // Ensure the value is within the slider bounds
+            const finalValue = Math.min(100, Math.max(0, value));
+            
+            performanceSlider.value = finalValue;
+            updatePerformanceDisplay(); // Update the label
+            calculateResult(); // Calculate the result
+        }
+
+        /**
+         * Calculates the final result based on performance and eased strength.
+         */
+        function calculateResult() {
+            const performance = parseFloat(performanceSlider.value);
+
+            // 1. Easing the exponential strength using a power function (S^0.35)
+            // The exponent 0.35 reduces the impact significantly, smoothing the curve.
+            const easedMultiplier = Math.pow(currentStrength, 0.35);
+
+            // 2. Determine the total factor (The / 10 is a tuning constant)
+            const strengthFactor = 1 + (easedMultiplier / 10);
+
+            // 3. Calculate the raw result (Performance * Factor)
+            const rawResult = performance * strengthFactor;
+
+            // 4. Cap the final result at 100%
+            const finalResult = Math.min(100, rawResult);
+
+            // Update displays
+            displayEasedStrength.textContent = easedMultiplier.toFixed(2);
+            displayFactor.textContent = strengthFactor.toFixed(2) + 'x';
+            resultValueDisplay.textContent = finalResult.toFixed(2) + '%';
+            
+            // Update the progress bar visually
+            resultBar.style.width = `${finalResult}%`;
+            
+            // Change color based on completion
+            if (finalResult >= 95) {
+                resultBar.classList.remove('bg-lime-600', 'bg-yellow-600');
+                resultBar.classList.add('bg-teal-500'); // Excellent result color
+            } else if (finalResult >= 70) {
+                resultBar.classList.remove('bg-teal-500', 'bg-red-600');
+                resultBar.classList.add('bg-lime-600'); // Good result color
+            } else {
+                 resultBar.classList.remove('bg-teal-500', 'bg-lime-600');
+                 resultBar.classList.add('bg-yellow-600'); // Base result color
+            }
+
+            // Update the text inside the bar only if it's wide enough
+            resultBar.textContent = finalResult > 5 ? finalResult.toFixed(1) + '%' : '';
+        }
+
+        // --- Event Listeners ---
+        levelSelect.addEventListener('change', updateCurrentStrength);
+        
+        // Listen to the slider change to update both the display and the result in real-time
+        performanceSlider.addEventListener('input', () => {
+            updatePerformanceDisplay();
+            calculateResult();
+        });
+
+        // --- Initialization ---
+        window.onload = () => {
+            populateLevels();
+            calculateResult();
+        };
+
+    </script>
+</body>
+</html>
