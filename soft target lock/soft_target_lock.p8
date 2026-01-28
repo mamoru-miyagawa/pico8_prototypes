@@ -2,26 +2,25 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 function _init()
-  -- player object
+  -- player
   p = {}
   p.x = 64
-  p.y = 90
+  p.y = 80
   p.sp = 1
   p.spd = 1.2
+  p.r = 30           -- the player's detection range
   p.lookx = 0
   p.looky = -1
+  p.target = nil
   
-  -- attack & lock state
+  -- attack timers
   p.atk_timer = 0
   p.atk_cooldown = 0
-  p.target = nil   -- stores which enemy we are locked on
-  
+
   -- enemy list
   enemies = {}
-  -- enemy 1
-  add(enemies, {x=50, y=60, r=25, sp=2})
-  -- enemy 2 (overlapping)
-  add(enemies, {x=85, y=60, r=25, sp=2})
+  add(enemies, {x=40, y=50, sp=2})
+  add(enemies, {x=80, y=50, sp=2})
 end
 -->8
 function _update()
@@ -31,32 +30,26 @@ function _update()
   if (btn(1)) dx += 1
   if (btn(2)) dy -= 1
   if (btn(3)) dy += 1
-  
   p.x += dx * p.spd
   p.y += dy * p.spd
 
-  -- 2. timers
+  -- 2. attack logic
   if p.atk_timer > 0 then p.atk_timer -= 1 end
   if p.atk_cooldown > 0 then p.atk_cooldown -= 1 end
 
-  -- 3. lock-on logic
   if btn(5) then
-    -- if we don't have a target, try to find one
+    -- if no target, find the closest one inside player's circle
     if p.target == nil then
-      p.target = find_closest_enemy()
+      p.target = find_closest_in_range()
     else
-      -- we have a target, check if we are still in range
-      local tx = p.target.x - p.x
-      local ty = p.target.y - p.y
-      local dist = sqrt(tx*tx + ty*ty)
-      
-      -- if we walk out of the circle, lose the lock
-      if dist > p.target.r then
-        p.target = nil
+      -- already have a target, check if they are still in player's circle
+      local dist = distance_to(p.target)
+      if dist > p.r then
+        p.target = nil -- target escaped the player's circle
       end
     end
 
-    -- if target is still valid, update look direction
+    -- look at target if it exists
     if p.target != nil then
       local tx = p.target.x - p.x
       local ty = p.target.y - p.y
@@ -72,7 +65,6 @@ function _update()
       p.atk_x = p.x + (p.lookx * 10)
       p.atk_y = p.y + (p.looky * 10)
     end
-    
   else
     -- button released
     p.target = nil
@@ -83,27 +75,32 @@ function _update()
   end
 end
 
-
--- bottom of tab 1 (outside of _update)
-function find_closest_enemy() -- and make sure the 't' is here too!
+-- helper: find nearest enemy within player's radius
+function find_closest_in_range()
   local closest = nil
   local min_dist = 999
   
   for e in all(enemies) do
-    local dx = e.x - p.x
-    local dy = e.y - p.y
-    local d = sqrt(dx*dx + dy*dy)
-    
-    if d < e.r and d < min_dist then
+    local d = distance_to(e)
+    if d <= p.r and d < min_dist then
       min_dist = d
       closest = e
     end
   end
   return closest
 end
+
+-- helper: simple distance math
+function distance_to(obj)
+  return sqrt((obj.x-p.x)^2 + (obj.y-p.y)^2)
+end
 -->8
 function _draw()
   cls()
+  
+  -- 1. draw the range circle around the player
+  -- color 5 is a dark grey, so it's not too distracting
+  circ(p.x, p.y, p.r, 5)
   
   -- draw all enemies
   for e in all(enemies) do
