@@ -48,6 +48,13 @@
       color: #000;
       border-color: #000;
     }
+    hr.separator {
+      border: 0;
+      height: 1px;
+      background: #eee;
+      margin: 20px auto;
+      width: 50%;
+    }
   </style>
 </head>
 <body>
@@ -67,13 +74,17 @@
       { name: "Jump Rope", folder: "jump_rope/jump_rope.html" },
       { name: "Community Bar", folder: "treasure_chest_bar/treasure_chest_bar.html" },
       { name: "Upgrade Feedback", folder: "upgrade_feedback/upgrade_feedback.html" },
+      { name: "Mallet Gameplay", folder: "mallet_gameplay/mallet_gameplay.html" },
+      { type: separator },
       { name: "Onboarding Arrow", folder: "onboarding_arrow/onboarding_arrow.html" },
       { name: "Watering Can", folder: "everbloom_wateringcan/everbloom_wateringcan.html" },
       { name: "Compost Bag", folder: "everbloom_compostbag/everbloom_compostbag.html" },
       { name: "Compost Bag 2", folder: "everbloom_compostbag_2/everbloom_compostbag_2.html" },
-      { name: "Mallet Gameplay", folder: "mallet_gameplay/mallet_gameplay.html" },
+      { type: separator },
       { name: "Fireplace Test", folder: "Fireplace/campfire_fireplace.html" },
       { name: "Soft Target Lock", folder: "soft target lock/soft_target_lock.html" },
+      { type: separator },
+      { name: "Radio Scramble", folder: "radio_scramble/radio_scramble.html" },      
     ];
 
     const list = document.getElementById("game-list");
