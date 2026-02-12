@@ -86,13 +86,20 @@
       { type: "separator" },
       { name: "Radio Scramble", folder: "radio_scramble/radio_scramble.html" },      
     ];
-
+    
     const list = document.getElementById("game-list");
+    
     games.forEach(game => {
       const li = document.createElement("li");
-      li.innerHTML = `<a href="${game.folder}" target="_blank">${game.name}</a>`;
+      
+      if (game.type === "separator") {
+        li.innerHTML = `<hr class="separator">`;
+      } else {
+        li.innerHTML = `<a href="${game.folder}" target="_blank">${game.name}</a>`;
+      }
+      
       list.appendChild(li);
-    });
+    });  
   </script>
 </body>
 </html>
