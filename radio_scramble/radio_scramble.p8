@@ -1,63 +1,71 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
--- radio scramble prototype --
+-- split-axis radio prototype --
 
 function _init()
-  -- 1. configuration
   msg = "this is a radio message"
-  target = 90      -- where the signal is clear
-  precision = 2    -- pixel perfect range
-  falloff = 45     -- how far the signal reaches (spread)
+  target_x = 90
+  target_y = 30
+  precision = 2
+  falloff = 45
   
-  -- 2. state variables
-  cursor = 64
+  cursor_x = 64
+  cursor_y = 64
+  
   scramble_timer = 0
-  scramble_speed = 4 -- higher is slower/less frenetic
+  scramble_speed = 4
   display_msg = ""
   
-  -- characters used for interference
   symbols = "abcdefghijklmnopqrstuvwxyz"
 end
 
 function _update()
-  -- slider movement
   local moving = false
-  if btn(0) then cursor -= 1 moving = true end
-  if btn(1) then cursor += 1 moving = true end
-  cursor = mid(0, cursor, 127)
-
-  -- calculate distance and interference level
-  local dist = abs(cursor - target)
+  if btn(0) then cursor_x -= 1 moving = true end
+  if btn(1) then cursor_x += 1 moving = true end
+  if btn(2) then cursor_y -= 1 moving = true end
+  if btn(3) then cursor_y += 1 moving = true end
   
-  -- interference: 0.0 (perfect) to 1.0 (pure noise)
-  -- we calculate this based on our falloff range
-  local interference = mid(0, dist / falloff, 1)
+  cursor_x = mid(10, cursor_x, 118)
+  cursor_y = mid(10, cursor_y, 118)
 
-  -- scramble logic
+  local dist_x = abs(cursor_x - target_x)
+  local dist_y = abs(cursor_y - target_y)
+  
+  local inter_x = mid(0, dist_x / falloff, 1)
+  local inter_y = mid(0, dist_y / falloff, 1)
+
   scramble_timer += 1
   if scramble_timer >= scramble_speed then
     scramble_timer = 0
-    
     local new_str = ""
+    
     for i=1, #msg do
       local char = sub(msg, i, i)
       
-      -- logic: 
-      -- 1. spaces never scramble
-      -- 2. if moving, chance to scramble based on distance
-      -- 3. if not moving, keep the current character (frozen scramble)
       if char != " " then
+        -- determine which slider "owns" this character
+        local interference = 0
+        local dist = 0
+        
+        if i % 2 == 0 then
+          interference = inter_x
+          dist = dist_x
+        else
+          interference = inter_y
+          dist = dist_y
+        end
+
+        -- apply scramble based on that slider's interference
         if moving and rnd(1) < interference then
-          -- pick a random junk character
           local r = flr(rnd(#symbols)) + 1
           new_str ..= sub(symbols, r, r)
         elseif not moving and dist > precision then
-          -- stay scrambled if we stopped outside the sweet spot
-          -- (prevents it from snapping to clear just because we stopped)
+          -- keep current junk if not in the sweet spot
           new_str ..= sub(display_msg, i, i)
         else
-          -- show the real character
+          -- slider is in the sweet spot for this letter!
           new_str ..= char
         end
       else
@@ -71,30 +79,27 @@ end
 function _draw()
   cls()
   
-  -- draw ui
-  print("tuning frequency...", 32, 20, 5)
+  -- draw sliders
+  line(10, 115, 118, 115, 6)
+  line(target_x-2, 114, target_x+2, 116, 14) 
+  circfill(cursor_x, 115, 2, 8) 
   
-  -- draw slider bar
-  line(10, 64, 118, 64, 6) -- gray track
+  line(5, 20, 5, 100, 6)
+  line(4, target_y-2, 6, target_y+2, 14) 
+  circfill(5, cursor_y, 2, 12) -- blue for y
   
-  -- draw the sweet spot (dim indicator)
-  line(target-2, 63, target+2, 65, 14) 
+  -- visual feedback: text color based on total lock
+  local dx = abs(cursor_x - target_x)
+  local dy = abs(cursor_y - target_y)
+  local col = 7
+  if dx <= precision and dy <= precision then col = 11 end
   
-  -- draw cursor
-  circfill(cursor, 64, 2, 8) -- red dot
+  print(display_msg, 20, 60, col)
   
-  -- change text color based on signal strength
-  local dist = abs(cursor - target)
-  local col = 7 -- white (perfect)
- -- if dist > precision then col = 6 end -- light gray (fuzzy)
- -- if dist > 20 then col = 5 end        -- dark gray (weak)
-  
-  -- print the message
-  print(display_msg, 24, 84, col)
-  
-  -- feedback text
-  if dist <= precision then
-    print("signal locked", 40, 100, 11)
+  if dx <= precision and dy <= precision then
+    print("full signal acquired", 28, 80, 11)
+  elseif dx <= precision or dy <= precision then
+    print("partial signal...", 35, 80, 6)
   end
 end
 __gfx__
