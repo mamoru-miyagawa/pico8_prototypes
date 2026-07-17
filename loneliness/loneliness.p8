@@ -4,30 +4,96 @@ __lua__
 -- loneliness
 -- state
 state="splash"
-px=64 py=64
+px=64 py=84
 spd=1 fc=0 jx=0 jy=0
-g0=22 g1=16 g2=8 gbri=1.2
-glow_growth=3
-light_growth=0.06
+g0b=10 g1b=8 g2b=6
+g0=10 g1=5 g2=4
+glow_growth=4
 att_sp=0.2
+npc_fillp=▒
+flee_range=24
+flee_sp=1.4
+-- flower: changes player glow color on hold X
+flower_charge=90
+flower_radius=8
+flower_particles=8
+flower_orbit_r=10
+flower_burst_r=80
+flower_burst_s=8
+flower_absorb_r=50
+-- big npc
+steal_range=56
+steal_interval=15
+steal_grace=60
+big_retreat_sp=0.3
+bg0=32 bg1=26 bg2=20
+big_spr={{33,34,49,50},{35,36,51,52},{37,38,53,54}}
+big_cycle={1,2,3,2}
 pollen_rep_r=30
 pollen_rep_s=1
 pollen_n=60
+pollen_respawn_cd=8
+pollen_cd=0
+pollen_deficit=0
 -- soundtrack: poke music pattern channel bytes to toggle empty flag (bit 6)
+snd_patterns=8
 function set_music_layers(att)
- for p=0,1 do
+ for p=0,snd_patterns-1 do
   local base=0x3100+p*4
-  local b1=peek(base+1)
-  if att>=1 then poke(base+1,band(b1,0xbf)) else poke(base+1,bor(b1,0x40)) end
-  local b2=peek(base+2)
-  if att>=2 then poke(base+2,band(b2,0xbf)) else poke(base+2,bor(b2,0x40)) end
+  for ch=1,3 do
+   local b=peek(base+ch)
+   if att>=ch then poke(base+ch,band(b,0xbf)) else poke(base+ch,bor(b,0x40)) end
+  end
  end
+end
+
+pcol=12
+function set_player_color(c)
+ if c==pcol then return end
+ pcol=c
+ for n in all(npcs) do
+  if n.col==c then
+   n.fleeing=false
+  elseif n.att and not n.stolen and n.col!=c then
+   n.att=false
+   n.fleeing=true
+   local dx,dy=n.x-px,n.y-py
+   local d=sqrt(dx*dx+dy*dy)
+   if d>0.001 then
+    local fx,fy=dx/d,dy/d
+    if fy<0 and abs(fx)<0.001 then fx=1 end
+    local fl=sqrt(fx*fx+fy*fy)
+    if fl>0.001 then fx=fx/fl fy=fy/fl end
+    n.fdx=fx n.fdy=fy
+   end
+   sfx(52)
+  end
+ end
+ local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+ set_music_layers(att)
 end
 
 -- npcs
 npcs={
- {x=10,y=20,jx=0,jy=0,att=false},
- {x=110,y=90,jx=0,jy=0,att=false},
+ {x=48,y=20,jx=0,jy=0,att=false,col=12,repel=false,stolen=false},
+ {x=104,y=90,jx=0,jy=0,att=false,col=12,repel=false,stolen=false},
+ {x=64,y=-40,jx=0,jy=0,att=false,col=8,repel=true,stolen=false},
+ {x=40,y=-120,jx=0,jy=0,att=false,col=14,repel=true,stolen=false},
+ {x=90,y=-200,jx=0,jy=0,att=false,col=11,repel=true,stolen=false},
+}
+-- big npc: passive thief, steals attached NPCs, retreats when att=0
+big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
+-- grass tufts next to each NPC spawn (sprite 7, world space, col 2 base glow)
+grass={}
+for i,n in ipairs(npcs) do
+ grass[i]={x=n.x+12,y=n.y}
+end
+-- flowers: sprite 9, world space, changes player color on hold X
+flowers={
+ {x=30,y=-30,col=12,used=false},
+ {x=80,y=-80,col=8,used=false},
+ {x=50,y=-160,col=14,used=false},
+ {x=90,y=-240,col=11,used=false},
 }
 rings={}
 
@@ -37,96 +103,8 @@ for i=1,pollen_n do
  pollen[i]={x=rnd(128),y=rnd(128),vx=(rnd()-0.5)*0.15,vy=(rnd()-0.5)*0.15,p=rnd(1)+0.5}
 end
 
--- light engine
-function crect(x1,y1,x2,y2,ln)
- x1,x2=max(x1,0),mid(x2,127)
- y1,y2=max(y1,0),min(y2,127)
- if x2<x1 or y2<y1 then return end
- for y=y1,y2 do ln(x1,x2,y) end
-end
-
-function fl_color(c)
- return function(x1,x2,y) rectfill(x1,y,x2,y,c) end
-end
-
-function fl_none() end
-
-function init_blending(nlevels)
- _sqrt={}
-  for i=0,8192 do _sqrt[i]=sqrt(i) end
- for lv=1,nlevels do
-  local addr=0x4300+lv*0x100
-  local sx=lv-1
-  for c1=0,15 do
-   local nc=sget(sx,c1+16)
-   local topl=shl(nc,4)
-   for c2=0,15 do
-    poke(addr,topl+sget(sx,c2+16))
-    addr+=1
-   end
-  end
- end
-end
-
-function fl_blend(l)
- local lutaddr=0x4300+shl(l,8)
- return function(x1,x2,y)
-  local yaddr=0x6000+shl(y,6)
-  local saddr,eaddr=
-   yaddr+band(shr(x1+1,1),0xffff),
-   yaddr+band(shr(x2-1,1),0xffff)
-  if band(x1,1.99995)>=1 then
-   local a=saddr-1
-   local p=peek(a)
-   poke(a,band(p,0xf)+band(peek(bor(lutaddr,p)),0xf0))
-  end
-  for addr=saddr,eaddr do
-   poke(addr,peek(bor(lutaddr,peek(addr))))
-  end
-  if band(x2,1.99995)<1 then
-   local a=eaddr+1
-   local p=peek(a)
-   poke(a,band(peek(bor(lutaddr,p)),0xf)+band(p,0xf0))
-  end
- end
-end
-
-light_rng={10*42,18*42,26*42,34*42,42*42}
-light_rng[0]=-1000
-light_fills={fl_none,fl_blend(2),fl_blend(3),fl_blend(4),fl_blend(5),fl_none}
-brkpts={}
-
-function fl_light(lx,ly,bri)
- local bf=bri*bri
- return function(x1,x2,y)
-  local ox,oy,oe=x1-lx,y-ly,x2-lx
-  local mul=bf
-  local ysq=oy*oy
-  local srng,erng,slv,elv=ysq+ox*ox,ysq+oe*oe
-  for lv=5,0,-1 do
-   local r=band(light_rng[lv]*mul,0xffff)
-   if not slv and srng>=r then slv=lv+1; if elv then break end end
-   if not elv and erng>=r then elv=lv+1; if slv then break end end
-  end
-  slv,elv=slv or 1,elv or 1
-  local llv,hlv=1,max(slv,elv)
-  local mind=max(x1-lx,lx-x2)
-  for lv=hlv-1,1,-1 do
-   local brng=band(light_rng[lv]*mul,0xffff)
-   local brp=_sqrt[brng-ysq]
-   brkpts[lv]=brp
-   if not brp or brp<mind then llv=lv+1; break end
-  end
-  local xs=lx+ox
-  for l=slv,llv+1,-1 do local xe=lx-brkpts[l-1]; light_fills[l](xs,xe-1,y); xs=xe end
-  for l=llv,elv-1 do local xe=lx+brkpts[l]; light_fills[l](xs,xe-1,y); xs=xe end
-  light_fills[elv](xs,x2,y)
- end
-end
-
 -- init
 function _init()
- init_blending(6)
  sfx(50) -- splash logo sting
 end
 
@@ -141,12 +119,37 @@ function _update()
    end
   return
  end
- if btn(0) then px-=spd end
- if btn(1) then px+=spd end
- if btn(2) then py-=spd end
- if btn(3) then py+=spd end
- px=mid(0,px,120)
- py=mid(0,py,120)
+ -- flower charge freezes player + handles charge
+ local flower_charging=false
+  for f in all(flowers) do
+   if not f.used then
+    local fdx,fdy=px-f.x,py-f.y
+    if abs(fdx)<flower_absorb_r and abs(fdy)<flower_absorb_r and btn(5) then
+     local fd=sqrt(fdx*fdx+fdy*fdy)
+     if fd<flower_absorb_r then
+      flower_charging=true
+      f.charge=(f.charge or 0)+1
+      if f.charge>=flower_charge then
+       f.charge=0
+       f.used=true
+       set_player_color(f.col)
+       add(rings,{r=8,a=36,vg=6,x=px+4,y=(py-cam_y)+4,col=f.col,burst=true})
+      end
+     else
+      f.charge=0
+     end
+    else
+     f.charge=0
+    end
+   end
+  end
+ if not flower_charging then
+  if btn(0) then px-=spd end
+  if btn(1) then px+=spd end
+  if btn(2) then py-=spd end
+  if btn(3) then py+=spd end
+ end
+ update_camera() -- level
  for p in all(pollen) do
   local dx,dy=p.x-px,p.y-py
   local d=sqrt(dx*dx+dy*dy)
@@ -155,38 +158,187 @@ function _update()
    p.x+=dx/d*f
    p.y+=dy/d*f
   end
-  p.x+=p.vx
-  p.y+=p.vy
-  if p.x<0 then p.x+=128 end
-  if p.x>128 then p.x-=128 end
-   if p.y<0 then p.y+=128 end
-   if p.y>128 then p.y-=128 end
-  end
- for i,n in ipairs(npcs) do
-  local dx,dy=px-n.x,py-n.y
-  local d=sqrt(dx*dx+dy*dy)
-  if d<40 or n.att then
-   local a=fc*0.008+(i-1)/#npcs
-   local tx,ty=px+cos(a)*16,py+sin(a)*16
-   local sp = n.att and att_sp or 0.05
-   n.x+=(tx-n.x)*sp
-   n.y+=(ty-n.y)*sp
-    if not n.att and d<20 then
-     n.att=true
-     add(rings,{r=8,a=12})
-     sfx(51) --attach chime
-      -- soundtrack: unmute layer per attached NPC
-      local att=0 for m in all(npcs) do if m.att then att+=1 end end
-      set_music_layers(att)
+  -- big cast ring pushes pollen away
+  if big.cast and not big.done then
+   local bdx,bdy=p.x-big.x,p.y-big.y
+   local br=36-big.cast_t
+   if br>-16 then
+    local bd=sqrt(bdx*bdx+bdy*bdy)
+    local reach=br+16
+    if bd<reach and bd>0.001 then
+     local f=(reach-bd)/reach*6
+     p.x+=bdx/bd*f
+     p.y+=bdy/bd*f
     end
+   end
+  end
+    -- flower burst ring pushes pollen aggressively
+    for r in all(rings) do
+     if r.burst then
+      local rdx,rdy=p.x-px,p.y-py
+      local rd=sqrt(rdx*rdx+rdy*rdy)
+      if rd<r.r+8 and rd>0.001 then
+       local f=(r.r+8-rd)/(r.r+8)*flower_burst_s
+       p.x+=rdx/rd*f
+       p.y+=rdy/rd*f
+       p.burst=true
+      end
+     end
+    end
+     p.x+=p.vx
+    p.y+=p.vy
+     if p.burst then
+      if p.x<-8 or p.x>136 or p.y-cam_y<-8 or p.y-cam_y>136 then
+       del(pollen,p)
+       pollen_deficit+=1
+      end
+     else
+     if p.x<0 then p.x+=128 end
+     if p.x>128 then p.x-=128 end
+     if p.y-cam_y<-16 then p.y+=160 end
+     if p.y-cam_y>144 then p.y-=160 end
+     end
+  end
+  -- slow pollen respawn after burst despawn
+  if pollen_deficit>0 then
+   pollen_cd+=1
+   if pollen_cd>=pollen_respawn_cd then
+    pollen_cd=0
+    add(pollen,{x=rnd(128),y=cam_y+rnd(128),vx=(rnd()-0.5)*0.15,vy=(rnd()-0.5)*0.15,p=rnd(1)+0.5})
+    pollen_deficit-=1
+   end
+  end
+  local norbit=0 for m in all(npcs) do if not m.repel and not m.stolen then norbit+=1 end end
+  local scount=0 for m in all(npcs) do if m.stolen then scount+=1 end end
+  local si=0
+  local oi=0
+  for n in all(npcs) do
+    if n.stolen then
+     if scount>0 then
+      local a=fc*0.008+si/scount
+      local tx,ty=big.x+cos(a)*16,big.y+sin(a)*16
+      n.x+=(tx-n.x)*0.05
+      n.y+=(ty-n.y)*0.05
+     end
+     si+=1
+     if big.done then del(npcs,n) end
+    else
+    local dx,dy=px-n.x,py-n.y
+    local d=sqrt(dx*dx+dy*dy)
+     if n.repel then
+       if not n.fleeing and d<flee_range and d>0.001 then
+        n.fleeing=true
+        local fx,fy=(n.x-px)/d,(n.y-py)/d
+        if fy<0 and abs(fx)<0.001 then fx=1 end
+        local fl=sqrt(fx*fx+fy*fy)
+        if fl>0.001 then fx=fx/fl fy=fy/fl end
+        n.fdx=fx
+       n.fdy=fy
+      end
+     if n.fleeing then
+      n.x+=n.fdx*flee_sp
+      n.y+=n.fdy*flee_sp
+     end
+     if n.x<-16 or n.x>144 or n.y>cam_y+144 then
+      del(npcs,n)
+     end
+    else
+     oi+=1
+     if d<40 or n.att then
+      local a=fc*0.008+(oi-1)/norbit
+      local tx,ty=px+cos(a)*16,py+sin(a)*16
+      local sp = n.att and att_sp or 0.05
+      local mvx,mvy=(tx-n.x)*sp,(ty-n.y)*sp
+      local mvl=sqrt(mvx*mvx+mvy*mvy)
+      if mvl>2 then mvx*=2/mvl mvy*=2/mvl end
+      n.x+=mvx
+      n.y+=mvy
+      if not n.att and d<20 then
+       n.att=true
+       n.att_fc=fc
+       big.sc=0
+       add(rings,{r=8,a=12})
+       sfx(51) --attach chime
+        -- soundtrack: unmute layer per attached NPC
+        local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+        set_music_layers(att)
+      end
+    end
+   end
   end
  end
+  -- big npc: static thief, steals only when visible on screen
+  if not big.done then
+   local bdy=big.y-cam_y
+   local big_onscreen = bdy>-16 and bdy<144
+   if not big.retreat then
+     if big_onscreen then
+      local pdx,pdy=px-big.x,py-big.y
+      if abs(pdx)<steal_range and abs(pdy)<steal_range and sqrt(pdx*pdx+pdy*pdy)<steal_range then
+       if not big.cast then
+        big.cast=true
+        big.cast_t=36
+        add(rings,{r=8,a=36,vg=4.5,x=big.x+8,y=(big.y-cam_y)+8})
+       end
+      end
+      if big.cast then
+       if big.cast_t>0 then
+        big.cast_t-=1
+       else
+        big.sc+=1
+        if big.sc>=steal_interval then
+         big.sc=0
+         for n in all(npcs) do
+          if n.att and not n.stolen and fc-(n.att_fc or 0)>steal_grace then
+            n.att=false
+            n.stolen=true
+            sfx(52) --detach chime
+            local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+            set_music_layers(att)
+            break
+          end
+         end
+        end
+       end
+      end
+     end
+     local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+     if big.cast and big.cast_t<=0 and att==0 and not big.post_steal then
+      big.post_steal=15
+     end
+      if big.post_steal then
+       big.post_steal-=1
+       if big.post_steal<=0 then
+        big.engaged=true big.retreat=true
+        local rdx,rdy=big.x-px,big.y-py
+        local rd=sqrt(rdx*rdx+rdy*rdy)
+        if rd>0.001 then
+         local fx,fy=rdx/rd,rdy/rd
+         if fy<0 and abs(fx)<0.001 then fx=1 end
+         fy*=0.2
+         local fl=sqrt(fx*fx+fy*fy)
+         if fl>0.001 then fx=fx/fl fy=fy/fl end
+         big.fdx=fx big.fdy=fy
+        end
+       end
+      end
+     else
+      big.x+=big.fdx*big_retreat_sp
+      big.y+=big.fdy*big_retreat_sp
+     if big.y-cam_y>144 or big.x<-16 or big.x>144 then big.done=true end
+    end
+   end
+  -- big npc twitch
+  if fc%8==0 then
+   big.jx=flr(rnd(3))-1
+   big.jy=flr(rnd(3))-1
+  end
  for r in all(rings) do
-  r.r+=1.5
+  r.r+=r.vg or 1.5
   r.a-=1
   if r.a<=0 then del(rings,r) end
+  end
  end
-end
 
 -- draw
 function _draw()
@@ -198,41 +350,145 @@ function _draw()
   print("hoshibocchi games",30,80,7)
   return
  end
- -- character glow + light
- local cx, cy = px+4, py+4
- local att=0
- for n in all(npcs) do if n.att then att+=1 end end
-  if fc%12==0 then
-   g0=22+att*glow_growth+rnd(3)-1.5
-   g1=16+att*glow_growth+rnd(3)-1.5
-   g2=8+att*glow_growth+rnd(2)-1
-   gbri=1.2+att*light_growth+rnd(0.16)-0.08
-  end
-  fillp(░) circfill(cx,cy,g0,1)
-  fillp(▒) circfill(cx,cy,g1,12)
-  fillp(0) circfill(cx,cy,g2,12)
-   local lrng=flr(42*gbri)
-  crect(cx-lrng,cy-lrng,cx+lrng,cy+lrng, fl_light(cx,cy,gbri))
- -- feedback rings
- for r in all(rings) do
-  local col=10
-  if r.a<6 then col=10 end
-  if r.a<3 then col=9 end
-  circ(cx,cy,r.r,col)
- end
- -- npcs
- for n in all(npcs) do
-  local nx,ny=n.x+4,n.y+4
-  if not n.att then
-   fillp(░) circfill(nx,ny,10,1)
+ -- grass shadows (under glow)
+ for g in all(grass) do
+  local sy=g.y-cam_y
+  if sy>-8 and sy<136 then
+   fillp(npc_fillp) circfill(g.x+4,sy+6,5,2)
    fillp(0)
   end
+ end
+ -- flower shadows (under glow, same as vegetation)
+ for f in all(flowers) do
+  local sy=f.y-cam_y
+  if sy>-8 and sy<136 then
+   fillp(npc_fillp) circfill(f.x+4,sy+6,5,2)
+   fillp(0)
+  end
+ end
+ -- character glow + light
+ local cx, cy = px+4, (py-cam_y)+4
+  local att=0
+  for n in all(npcs) do if n.att and not n.stolen then att+=1 end end
+  if fc%12==0 then
+   g0=g0b+att*glow_growth+rnd(3)-1.5
+   g1=g1b+att*glow_growth+rnd(3)-1.5
+   g2=g2b+att*glow_growth+rnd(2)-1
+  end
+  fillp(░) circfill(cx,cy,g0,pcol)
+  fillp(▒) circfill(cx,cy,g1,pcol)
+  fillp(0) circfill(cx,cy,g2,pcol)
+  -- feedback rings
+  for r in all(rings) do
+   local col=10
+   if r.a<6 then col=10 end
+   if r.a<3 then col=9 end
+   circ(r.x or cx, r.y or cy, r.r, r.col or col)
+  end
+ -- grass sprites (on top of glow)
+ for g in all(grass) do
+  local sy=g.y-cam_y
+  if sy>-8 and sy<136 then
+   spr(7,g.x,sy)
+  end
+ end
+  -- flowers: sprite + colored orbiting particles
+   for f in all(flowers) do
+    local sy=f.y-cam_y
+    if sy>-8 and sy<136 then
+     spr(f.used and 10 or 9,f.x,sy)
+     if not f.used then
+      -- idle orbit (only when not charging)
+      if (f.charge or 0)==0 then
+       for i=1,flower_particles do
+        local a=fc*0.05+i/flower_particles
+        local ox,oy=cos(a)*flower_orbit_r,sin(a)*flower_orbit_r
+        circfill(f.x+4+ox,sy+4+oy,1.5,f.col)
+       end
+      end
+      -- charge: emit from center ヌ●★ random angle ヌ●★ home to player; taper to 0 by completion
+      if (f.charge or 0)>0 then
+       local prog=f.charge/flower_charge
+       circ(f.x+4,sy+4,prog*20,10)
+       local pcx,pcy=f.x+4,sy+4
+       local tx,ty=px+4,(py-cam_y)+4
+       local np=flr((1-prog*prog)*30)
+       for i=1,np do
+        local speed=0.004+(i%4)*0.002
+        local cyc=flr(fc*speed+i/np)
+        local ang=(sin(cyc*78.233+i*13.1)+1)*0.5
+        local t2=(fc*speed+i/np)%1
+        local emit_r=12
+        if t2<0.4 then
+         local e=t2/0.4
+         local ee=1-(1-e)*(1-e)
+         circfill(pcx+cos(ang)*emit_r*ee,pcy+sin(ang)*emit_r*ee,1.5,f.col)
+        else
+         local h=(t2-0.4)/0.6
+         local sx=pcx+cos(ang)*emit_r
+         local sy2=pcy+sin(ang)*emit_r
+         circfill(sx+(tx-sx)*h*h,sy2+(ty-sy2)*h*h,1.5,f.col)
+        end
+       end
+       -- particles accumulate around player, spiraling in
+       local np_p=flr(prog*prog*20)
+       for i=1,np_p do
+        local a=fc*0.08+i/np_p
+        local r=20-prog*15
+        circfill(tx+cos(a)*r,ty+sin(a)*r,1.5,f.col)
+       end
+      end
+     end
+    end
+   end
+  -- "hold x" prompt under player when near unused flower
+  local show_prompt=false
+  for f in all(flowers) do
+   if not f.used and (f.charge or 0)==0 then
+    local fdx,fdy=px-f.x,py-f.y
+    if abs(fdx)<flower_absorb_r and abs(fdy)<flower_absorb_r then
+     local fd=sqrt(fdx*fdx+fdy*fdy)
+     if fd<flower_absorb_r then
+      show_prompt=true
+      break
+     end
+    end
+   end
+  end
+  if show_prompt then
+   print("hold ❎",px-9,(py-cam_y)+22,7)
+  end
+   -- big npc glow + sprite
+   if not big.done then
+    local bcx,bcy=big.x+8,(big.y-cam_y)+8
+    if fc%12==0 then
+     bg0=28+rnd(3)-1.5
+     bg1=20+rnd(3)-1.5
+     bg2=12+rnd(2)-1
+    end
+    fillp(░) circfill(bcx,bcy,bg0,1)
+    fillp(▒) circfill(bcx,bcy,bg1,12)
+    fillp(0) circfill(bcx,bcy,bg2,12)
+     local bs=big_spr[big_cycle[flr(t()*8)%4+1]]
+     spr(bs[1],big.x+big.jx,big.y-cam_y+big.jy)
+     spr(bs[2],big.x+8+big.jx,big.y-cam_y+big.jy)
+     spr(bs[3],big.x+big.jx,big.y-cam_y+8+big.jy)
+     spr(bs[4],big.x+8+big.jx,big.y-cam_y+8+big.jy)
+   end
+   -- npcs
+ for n in all(npcs) do
+  local nx,ny=n.x+4,(n.y-cam_y)+4
+   if not n.att and not n.stolen then
+    fillp(npc_fillp) circfill(nx,ny,7,n.col)
+    fillp(0) circfill(nx,ny,5,n.col)
+    fillp(0)
+   end
   if fc%8==0 then
    n.jx=flr(rnd(3))-1
    n.jy=flr(rnd(3))-1
   end
   local s=flr(t()*8)%2+4
-  spr(s,n.x+n.jx,n.y+n.jy)
+  spr(s,n.x+n.jx,(n.y-cam_y)+n.jy)
  end
  --fillp(0)     circfill(cx,cy,6,6)
 
@@ -242,25 +498,34 @@ function _draw()
   jy=flr(rnd(3))-1
  end
  local s=flr(t()*8)%2+1
- spr(s,px+jx,py+jy)
- -- pollen on top
- for p in all(pollen) do
-  circfill(p.x,p.y,p.p,15)
- end
+ spr(s,px+jx,(py-cam_y)+jy)
+    -- pollen on top
+    for p in all(pollen) do
+     circfill(p.x,p.y-cam_y,p.p,15)
+    end
 end
 -->8
--- level loader
+-- level: infinite ascending corridor
+cam_y=0
+corridor_l=0
+corridor_r=120
+cam_dead=60
+
+function update_camera()
+ local sy=py-cam_y
+ if sy<cam_dead then cam_y-=(cam_dead-sy) end
+ if py>cam_y+120 then py=cam_y+120 end
+ px=mid(corridor_l,px,corridor_r)
+end
 __gfx__
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000700000070000000000000000070000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700070770700707707000000000007007000070070000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000007777007077770700000000000770000707707000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000007777000077770000000000000770000007700000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700000770000007700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000b00000000000077000000000000000000000000000000000000000000000000000
+00000000700000070000000000000000070000700000000000000000b000030b0000000000777700000000000000000000000000000000000000000000000000
+007007000707707007077070000000000070070000700700000000000300030000000000077aa770000550000000000000000000000000000000000000000000
+00077000007777007077770700000000000770000707707000000000030030000000000000777700005555000000000000000000000000000000000000000000
+00077000007777000077770000000000000770000007700000000000003030000000000000377000055445500000000000000000000000000000000000000000
+00700700000770000007700000000000000000000000000000000000000300000000000003300000015555000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000000000000003000000000000003bb000001330000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000000000000003000000000000000b0000000300000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -271,14 +536,16 @@ __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000070000000000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000777000000000077700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000077000777700077007700077770007700000007777000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000007707777770770077770777777077770077077777707700000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077777777000007707777777707700770777777770770000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077777777000000007777777700007770777777770777000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077777777000000007777777700000700777777770070000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000077777777000000007777777700000000777777770000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000007777770000000000777777000000000077777700000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000777700000000000077770000000000007777000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -507,19 +774,19 @@ __label__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
 __sfx__
-c11c00000c7200c7200c7200c7200c7200c7200c7200c7200f7200f7200f7200f7200f7200f7200f7200f72008720087200872008720087200872008720087200872008720087200872008720087200872008720
-611c00001303013030130301303013030130301302013010160201602016020160201602016020160201601016030160301603016030160301603016030160301603016030160301603016030160301602016010
+c11c00000c7300c7100c7300c7100c7300c7100c7300c7100f7300f7100f7300f7100f7300f7100f7300f71008730087100873008710087300871008730087100873008710087300871008730087100873008710
+611c00001304013030130201301013040130301302013010160401603016020160101604016030160201601016040160301602016010160401603016020160101604016030160201601016040160301602016010
 011c000018702187021870200702227422273222722227121f7421f7321f7221f7121f7021f7021d7421d7421b7421b7421b7421b7421b7421b7421b7421b7421b7421b7421b7321b7321b7221b7221b7121b712
-011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-c11c00000c7200c7200c7200c7200c7200c7200c7200c7200a7200a7200a7200a7200a7200a7200a7200a72008720087200872008720087200872008720087200872008720087200872008720087200872008720
-611c0000130301303013030130301303013030130201301011030110301103011030110301103011020110100f0300f0300f0300f0300f0300f0300f0300f0300f0300f0300f0300f0300f0300f0300f0200f010
+d11c000018702187021870200702227022270229742297322972229712267422673226722267122274222732227222271222712227122271222712247022470224702247022e7022e7022e7022e7022e7022e702
+c11c00000c7300c7100c7300c7100c7300c7100c7300c7100a7300a7100a7300a7100a7300a7100a7300a71008730087100873008710087300871008730087100873008710087300871008730087100873008710
+611c0000130401303013020130101304013030130201301011040110301102011010110401103011020110100f0400f0300f0200f0100f0400f0300f0200f0100f0400f0300f0200f0100f0400f0300f0400f030
 011c00001b7421b7321b7221b7121f7421f7321f7221f7121d7421d7421d7421d7321d7221d71216742167421b7421b7421b7421b7421b7421b7421b7421b7421b7421b7421b7321b7321b7221b7221b7121b712
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+d11c00001870218702187020070222702227022e7422e7322e7222e712247422473224722247121d7421d732227422274222732227322272222712227122470224702247022e7022e7022e7022e7022e7022e702
+c11c00000c7320c7320c7320c7320c7320c7320c7320c7320f7320f7320f7320f7320f7320f7320f7320f73208732087320873208732087320873208732087320873208732087320873208732087320873208712
+c11c00000c7320c7320c7320c7320c7320c7320c7320c7320a7320a7320a7320a7320a7320a7320a7320a73208732087320873208732087320873208732087320873208732087320873208732087320873208712
+c11c00000c1320f1321313218132181120f13213132181320f13213132161321813218112131321613218132081320c1320f13213132131120c1320f13213132141320c1320f13213132131320c1320f13213112
+c11c00000c1320f1321313218132181120f13213132181320a1320e1321113216132161120e1321113216132141320c1320f13213132131120c1320f13213132141320c1320f13213132141320c1320f13214132
+011c0000000530c205246550c2550c0030c205246550c2550c0030c255246550c2550c0030c205246050c255000530c255246050c2550c0530c205246550c255000530c255246550c2050c0530c205246550c255
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -558,8 +825,16 @@ c11c00000c7200c7200c7200c7200c7200c7200c7200c7200a7200a7200a7200a7200a7200a7200a
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00100000267303273026740327403b7503b7303b71006700327003b7003b7003b7003b700327003b7003b7003b700000000000000000000000000000000067000000000000000000000000000000000000000000
-000800002555035550355303551035500355000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
+000800002575034750347303471035700357000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
+000400001575016550197501074011540137301f7001f7001f7000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 __music__
-00 00010244
-02 04050644
+00 00010243
+00 04050647
+00 00010203
+00 04050607
+00 08010203
+00 09050607
+01 000a0603
+02 040b0607
+00 4b454647
 
