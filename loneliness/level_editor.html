@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loneliness — Level Editor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { display: flex; font-family: monospace; background: #1a1a2e; color: #c2c3c7; height: 100vh; overflow: hidden; }
+  #sidebar { width: 340px; padding: 16px; overflow-y: auto; border-right: 1px solid #333; flex-shrink: 0; }
+  #sidebar h2 { font-size: 14px; margin-bottom: 12px; color: #29adff; }
+  #sidebar h3 { font-size: 11px; margin: 16px 0 6px; color: #83769c; text-transform: uppercase; letter-spacing: 1px; }
+  .tools, .colors { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .tools button, .colors button, .actions button {
+    padding: 6px 10px; border: 1px solid #333; background: #222; color: #c2c3c7;
+    cursor: pointer; font-family: monospace; font-size: 11px; border-radius: 3px;
+  }
+  .tools button.active, .colors button.active { border-color: #29adff; background: #1d2b53; }
+  .colors button { min-width: 60px; text-align: left; }
+  .colors button span { color: #000; padding: 0 4px; border-radius: 2px; }
+  .actions { display: flex; flex-direction: column; gap: 4px; }
+  .actions button { text-align: left; }
+  #btn-clear { border-color: #ff004d; color: #ff77a8; }
+  .info { font-size: 11px; line-height: 1.8; margin: 12px 0; padding: 8px; background: #111; border-radius: 4px; }
+  .info span { color: #29adff; }
+  .count-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .count-row label { font-size: 11px; color: #83769c; }
+  .count-row input { width: 50px; padding: 4px; background: #111; color: #c2c3c7; border: 1px solid #333; border-radius: 3px; font-family: monospace; }
+  #code-output {
+    width: 100%; height: 220px; margin-top: 8px; background: #111; color: #00e436;
+    border: 1px solid #333; border-radius: 4px; padding: 8px; font-family: monospace;
+    font-size: 10px; resize: vertical; white-space: pre;
+  }
+  #canvas-container { flex: 1; overflow: auto; background: #0d0d1a; padding: 20px; position: relative; }
+  canvas { display: block; image-rendering: pixelated; cursor: crosshair; }
+  .hint { font-size: 10px; color: #5f574f; margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h2>Loneliness — Level Editor</h2>
+
+  <h3>Tool</h3>
+  <div class="tools">
+    <button data-tool="plant" class="active">🌱 Plant</button>
+    <button data-tool="flower">🌸 Flower</button>
+    <button data-tool="big">👾 Big NPC</button>
+    <button data-tool="select">✋ Select</button>
+  </div>
+
+  <h3>Color (Plant / Flower)</h3>
+  <div class="colors">
+    <button data-col="12" class="active"><span style="background:#29ADFF">&nbsp;&nbsp;</span> Blue</button>
+    <button data-col="8"><span style="background:#FF004D">&nbsp;&nbsp;</span> Red</button>
+    <button data-col="6"><span style="background:#C2C3C7">&nbsp;&nbsp;</span> White</button>
+    <button data-col="14"><span style="background:#FF77A8">&nbsp;&nbsp;</span> Pink</button>
+  </div>
+
+  <h3>NPC Spawn Count <span id="count-context" style="color:#5f574f;font-weight:normal">(next plant)</span></h3>
+  <div class="count-row">
+    <label>Count:</label>
+    <input type="number" id="npc-count-input" min="1" max="8" value="1">
+  </div>
+
+  <div class="info">
+    Tool: <span id="cur-tool">Plant</span><br>
+    Color: <span id="cur-color">Blue</span><br>
+    Plants: <span id="plant-count">0</span> | Flowers: <span id="flower-count">0</span><br>
+    Selected: <span id="sel-info">none</span>
+  </div>
+
+  <h3>Actions</h3>
+  <div class="actions">
+    <button id="btn-export">⬇ Export Lua + .txt</button>
+    <button id="btn-copy">📋 Copy Code</button>
+    <button id="btn-load">📂 Load Setup</button>
+    <button id="btn-clear">🗑 Clear All</button>
+  </div>
+  <input type="file" id="file-input" accept=".txt,.lua" hidden>
+
+  <h3>Exported Code (paste into tab 1)</h3>
+  <textarea id="code-output" readonly></textarea>
+  <p class="hint">
+    Click to place. Click entity to select. Drag to move. Del key or ✕ to remove.<br>
+    Selecting a plant/flower then clicking a color updates that entity.<br>
+    Plants expand to N NPCs clustered on export. Grass auto-derives (NPC x+12).<br>
+    Player spawns at (64,84). World Y goes up = negative.
+  </p>
+</div>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+// ── PICO-8 palette ──
+const PAL = {0:'#000',1:'#1D2B53',2:'#7E2553',3:'#008751',4:'#AB5236',5:'#5F574F',
+  6:'#C2C3C7',7:'#FFF1E8',8:'#FF004D',9:'#FFA300',10:'#FFEC27',11:'#00E436',
+  12:'#29ADFF',13:'#83769C',14:'#FF77A8',15:'#FFCCAA'};
+const COL_NAMES = {12:'Blue',8:'Red',6:'White',14:'Pink'};
+
+// ── State ──
+let tool = 'plant';
+let curCol = 12;
+let curCount = 1;
+// plants: {x, y, col, count} — each plant expands to `count` NPCs on export
+let plants = [
+  {x:48, y:20, col:12, count:1},
+  {x:104, y:90, col:12, count:1},
+  {x:64, y:-40, col:8, count:1},
+  {x:40, y:-120, col:14, count:1},
+  {x:90, y:-200, col:6, count:1},
+];
+let flowers = [{x:30,y:-30,col:12},{x:80,y:-80,col:8},{x:50,y:-160,col:14},{x:90,y:-240,col:6}];
+let big = {x:64, y:-260};
+let selected = null; // {type:'plant'|'flower'|'big', idx}
+let dragging = false;
+
+// ── Canvas setup ──
+const SCALE = 3;
+const WORLD_TOP = -350, WORLD_BOT = 130;
+const WW = 128, WH = WORLD_BOT - WORLD_TOP;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = WW * SCALE;
+canvas.height = WH * SCALE;
+
+const w2c = (wx, wy) => [wx * SCALE, (wy - WORLD_TOP) * SCALE];
+const c2w = (cx, cy) => [Math.round(cx / SCALE), Math.round(cy / SCALE) + WORLD_TOP];
+
+// ── Expand plants to NPC entries (for export) ──
+function expandPlants() {
+  let npcs = [];
+  plants.forEach(p => {
+    if (p.count <= 1) {
+      npcs.push({x: p.x, y: p.y, col: p.col});
+    } else {
+      let r = 6;
+      for (let i = 0; i < p.count; i++) {
+        let a = (i / p.count) * Math.PI * 2 - Math.PI / 2;
+        npcs.push({
+          x: Math.round(p.x + Math.cos(a) * r),
+          y: Math.round(p.y + Math.sin(a) * r),
+          col: p.col
+        });
+      }
+    }
+  });
+  return npcs;
+}
+
+// ── Render ──
+function draw() {
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // grid every 16px
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= 128; x += 16) {
+    let [cx] = w2c(x, 0);
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke();
+  }
+  for (let y = Math.ceil(WORLD_TOP/16)*16; y <= WORLD_BOT; y += 16) {
+    let [, cy] = w2c(0, y);
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy); ctx.stroke();
+  }
+
+  // initial screen viewport (cam_y=0: world y 0..128)
+  let [, vy0] = w2c(0, 0);
+  let [, vy1] = w2c(0, 128);
+  ctx.strokeStyle = '#5F574F'; ctx.setLineDash([4,4]);
+  ctx.strokeRect(0, vy0, canvas.width, vy1 - vy0);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#5F574F'; ctx.font = '10px monospace';
+  ctx.fillText('y=0 (screen top at start)', 4, vy0 - 4);
+
+  // player spawn marker
+  let [pcx, pcy] = w2c(64, 84);
+  ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 2;
+  ctx.strokeRect(pcx - SCALE*4, pcy - SCALE*4, SCALE*8, SCALE*8);
+  ctx.fillStyle = '#FFF1E8'; ctx.font = '9px monospace';
+  ctx.fillText('player (64,84)', pcx + SCALE*5, pcy);
+
+  // Plants (grass tuft + NPC cluster preview)
+  plants.forEach((p, i) => {
+    let [cx, cy] = w2c(p.x, p.y);
+    // grass tuft icon (green)
+    ctx.fillStyle = '#008751';
+    ctx.fillRect(cx - SCALE*2, cy - SCALE*2, SCALE*4, SCALE*4);
+    ctx.fillStyle = '#00E436';
+    ctx.fillRect(cx - SCALE, cy - SCALE, SCALE*2, SCALE*2);
+    // NPC cluster preview dots
+    if (p.count > 1) {
+      let r = 6;
+      for (let j = 0; j < p.count; j++) {
+        let a = (j / p.count) * Math.PI * 2 - Math.PI / 2;
+        let [dx, dy] = w2c(p.x + Math.cos(a)*r, p.y + Math.sin(a)*r);
+        ctx.fillStyle = PAL[p.col];
+        ctx.beginPath(); ctx.arc(dx, dy, SCALE*2, 0, Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = PAL[p.col];
+      ctx.beginPath(); ctx.arc(cx + SCALE*3, cy, SCALE*2, 0, Math.PI*2); ctx.fill();
+    }
+    // count label
+    ctx.fillStyle = '#FFEC27'; ctx.font = '9px monospace';
+    ctx.fillText('×' + p.count, cx + SCALE*4, cy - SCALE*4);
+    // selection highlight
+    if (selected && selected.type === 'plant' && selected.idx === i) {
+      ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
+      ctx.strokeRect(cx - SCALE*5, cy - SCALE*5, SCALE*10, SCALE*10);
+    }
+  });
+
+  // Flowers
+  flowers.forEach((f, i) => {
+    let [cx, cy] = w2c(f.x, f.y);
+    ctx.fillStyle = PAL[f.col];
+    for (let a = 0; a < 5; a++) {
+      let ang = (a / 5) * Math.PI * 2 - Math.PI/2;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(ang)*SCALE*3, cy + Math.sin(ang)*SCALE*3, SCALE*2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#FFEC27';
+    ctx.beginPath(); ctx.arc(cx, cy, SCALE*1.5, 0, Math.PI*2); ctx.fill();
+    if (selected && selected.type === 'flower' && selected.idx === i) {
+      ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, SCALE*7, 0, Math.PI*2); ctx.stroke();
+    }
+  });
+
+  // Big NPC
+  {
+    let [cx, cy] = w2c(big.x, big.y);
+    ctx.strokeStyle = '#1D2B53'; ctx.lineWidth = 3;
+    ctx.strokeRect(cx - SCALE*8, cy - SCALE*8, SCALE*16, SCALE*16);
+    ctx.fillStyle = '#1D2B53'; ctx.font = '9px monospace';
+    ctx.fillText('BIG', cx - SCALE*4, cy + SCALE*1);
+    if (selected && selected.type === 'big') {
+      ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
+      ctx.strokeRect(cx - SCALE*10, cy - SCALE*10, SCALE*20, SCALE*20);
+    }
+  }
+
+  // Floating delete button near selected
+  if (selected) {
+    let e = getSelectedEntity();
+    let [cx, cy] = w2c(e.x, e.y);
+    let bx = cx + SCALE*8, by = cy - SCALE*8;
+    // red circle with ✕
+    ctx.fillStyle = '#FF004D';
+    ctx.beginPath(); ctx.arc(bx, by, SCALE*4, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx - SCALE*2, by - SCALE*2); ctx.lineTo(bx + SCALE*2, by + SCALE*2);
+    ctx.moveTo(bx + SCALE*2, by - SCALE*2); ctx.lineTo(bx - SCALE*2, by + SCALE*2);
+    ctx.stroke();
+  }
+
+  updateInfo();
+}
+
+function getSelectedEntity() {
+  if (!selected) return null;
+  if (selected.type === 'big') return big;
+  if (selected.type === 'plant') return plants[selected.idx];
+  if (selected.type === 'flower') return flowers[selected.idx];
+  return null;
+}
+
+function updateInfo() {
+  document.getElementById('plant-count').textContent = plants.length;
+  document.getElementById('flower-count').textContent = flowers.length;
+  let e = getSelectedEntity();
+  if (e) {
+    let countStr = selected.type === 'plant' ? ' ×' + e.count : '';
+    document.getElementById('sel-info').textContent = `${selected.type} (${e.x},${e.y})${countStr}`;
+  } else {
+    document.getElementById('sel-info').textContent = 'none';
+  }
+  // update count input context
+  let ctx = document.getElementById('count-context');
+  if (selected && selected.type === 'plant') {
+    ctx.textContent = '(selected plant)';
+    document.getElementById('npc-count-input').value = plants[selected.idx].count;
+  } else {
+    ctx.textContent = '(next plant)';
+  }
+}
+
+// ── Hit test ──
+function hitTest(wx, wy) {
+  if (Math.abs(wx - big.x) < 9 && Math.abs(wy - big.y) < 9) return {type:'big', idx:0};
+  for (let i = plants.length - 1; i >= 0; i--) {
+    let p = plants[i];
+    if (Math.abs(wx - p.x) < 6 && Math.abs(wy - p.y) < 6) return {type:'plant', idx:i};
+  }
+  for (let i = flowers.length - 1; i >= 0; i--) {
+    let f = flowers[i];
+    if (Math.abs(wx - f.x) < 6 && Math.abs(wy - f.y) < 6) return {type:'flower', idx:i};
+  }
+  return null;
+}
+
+// ── Delete button hit test (in canvas coords) ──
+function deleteBtnHit(clickCX, clickCY) {
+  if (!selected) return false;
+  let e = getSelectedEntity();
+  let [cx, cy] = w2c(e.x, e.y);
+  let bx = cx + SCALE*8, by = cy - SCALE*8;
+  let dx = clickCX - bx, dy = clickCY - by;
+  return (dx*dx + dy*dy) < (SCALE*5)*(SCALE*5);
+}
+
+// ── Mouse ──
+canvas.addEventListener('mousedown', e => {
+  let rect = canvas.getBoundingClientRect();
+  let clickCX = e.clientX - rect.left, clickCY = e.clientY - rect.top;
+  let [wx, wy] = c2w(clickCX, clickCY);
+
+  // check delete button first
+  if (deleteBtnHit(clickCX, clickCY)) {
+    deleteSelected();
+    draw();
+    return;
+  }
+
+  let hit = hitTest(wx, wy);
+  if (hit) {
+    selected = hit;
+    dragging = true;
+  } else if (tool === 'plant') {
+    plants.push({x: wx, y: wy, col: curCol, count: curCount});
+    selected = {type:'plant', idx: plants.length - 1};
+    dragging = true;
+  } else if (tool === 'flower') {
+    flowers.push({x: wx, y: wy, col: curCol});
+    selected = {type:'flower', idx: flowers.length - 1};
+    dragging = true;
+  } else if (tool === 'big') {
+    big.x = wx; big.y = wy;
+    selected = {type:'big', idx:0};
+    dragging = true;
+  } else {
+    selected = null;
+  }
+  draw();
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!dragging || !selected) return;
+  let rect = canvas.getBoundingClientRect();
+  let [wx, wy] = c2w(e.clientX - rect.left, e.clientY - rect.top);
+  if (selected.type === 'plant') plants[selected.idx].x = wx, plants[selected.idx].y = wy;
+  else if (selected.type === 'flower') flowers[selected.idx].x = wx, flowers[selected.idx].y = wy;
+  else if (selected.type === 'big') big.x = wx, big.y = wy;
+  draw();
+});
+
+canvas.addEventListener('mouseup', () => { dragging = false; });
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  let rect = canvas.getBoundingClientRect();
+  let [wx, wy] = c2w(e.clientX - rect.left, e.clientY - rect.top);
+  let hit = hitTest(wx, wy);
+  if (hit) { selected = hit; deleteSelected(); }
+});
+
+// ── Delete ──
+function deleteSelected() {
+  if (!selected) return;
+  if (selected.type === 'plant') plants.splice(selected.idx, 1);
+  else if (selected.type === 'flower') flowers.splice(selected.idx, 1);
+  selected = null;
+}
+
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selected && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    deleteSelected();
+    draw();
+  }
+});
+
+// ── Tool buttons ──
+document.querySelectorAll('.tools button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tools button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    tool = b.dataset.tool;
+    document.getElementById('cur-tool').textContent = b.textContent;
+  });
+});
+
+// ── Color buttons: update selected entity OR set next-placement color ──
+document.querySelectorAll('.colors button').forEach(b => {
+  b.addEventListener('click', () => {
+    let col = parseInt(b.dataset.col);
+    if (selected && (selected.type === 'plant' || selected.type === 'flower')) {
+      // update selected entity's color
+      let e = getSelectedEntity();
+      e.col = col;
+    } else {
+      // set next-placement color
+      document.querySelectorAll('.colors button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      curCol = col;
+      document.getElementById('cur-color').textContent = COL_NAMES[col];
+    }
+    draw();
+  });
+});
+
+// ── Count input: update selected plant OR set next-placement count ──
+document.getElementById('npc-count-input').addEventListener('input', e => {
+  let v = Math.max(1, Math.min(8, parseInt(e.target.value) || 1));
+  e.target.value = v;
+  if (selected && selected.type === 'plant') {
+    plants[selected.idx].count = v;
+  } else {
+    curCount = v;
+  }
+  draw();
+});
+
+// ── Export ──
+function generateLua() {
+  let npcList = expandPlants();
+  let lines = [];
+  // metadata comment for lossless re-import (ignored by PICO-8)
+  let meta = JSON.stringify(plants.map(p => ({x:p.x,y:p.y,col:p.col,count:p.count})));
+  lines.push('-- editor:plants=' + meta);
+  lines.push('-- npcs');
+  lines.push('npcs={');
+  npcList.forEach(n => {
+    lines.push(` {x=${n.x},y=${n.y},jx=0,jy=0,att=false,col=${n.col},stolen=false},`);
+  });
+  lines.push('}');
+  lines.push('-- big npc: passive thief, steals attached NPCs, retreats when att=0');
+  lines.push(`big={x=${big.x},y=${big.y},done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}`);
+  lines.push('-- grass tufts next to each NPC spawn (sprite 7, world space, col 2 base glow)');
+  lines.push('grass={}');
+  lines.push('for i,n in ipairs(npcs) do');
+  lines.push(' grass[i]={x=n.x+12,y=n.y}');
+  lines.push('end');
+  lines.push('-- flowers: sprite 9, world space, changes player color on hold X');
+  lines.push('flowers={');
+  flowers.forEach(f => {
+    lines.push(` {x=${f.x},y=${f.y},col=${f.col},used=false},`);
+  });
+  lines.push('}');
+  return lines.join('\n');
+}
+
+document.getElementById('btn-export').addEventListener('click', () => {
+  let lua = generateLua();
+  document.getElementById('code-output').value = lua;
+  let blob = new Blob([lua], {type:'text/plain'});
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'level_setup.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('btn-copy').addEventListener('click', () => {
+  let ta = document.getElementById('code-output');
+  ta.select();
+  document.execCommand('copy');
+});
+
+// ── Load ──
+document.getElementById('btn-load').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  let file = e.target.files[0];
+  if (!file) return;
+  let reader = new FileReader();
+  reader.onload = () => parseLua(reader.result);
+  reader.readAsText(file);
+});
+
+function parseLua(text) {
+  // try metadata comment first (lossless)
+  let metaMatch = text.match(/-- editor:plants=(\[[\s\S]*?\])/);
+  if (metaMatch) {
+    try {
+      let parsed = JSON.parse(metaMatch[1]);
+      plants = parsed.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count}));
+    } catch(e) { plants = []; }
+  } else {
+    // fallback: parse npc entries, each becomes count=1 plant
+    plants = [];
+    let npcMatch = text.match(/npcs=\{([\s\S]*?)\}/);
+    if (npcMatch) {
+      let re = /x=(-?\d+),y=(-?\d+)[^}]*col=(\d+)/g;
+      let m;
+      while ((m = re.exec(npcMatch[1]))) plants.push({x:+m[1], y:+m[2], col:+m[3], count:1});
+    }
+  }
+  // parse flowers
+  flowers = [];
+  let flMatch = text.match(/flowers=\{([\s\S]*?)\}/);
+  if (flMatch) {
+    let re = /x=(-?\d+),y=(-?\d+),col=(\d+)/g;
+    let m;
+    while ((m = re.exec(flMatch[1]))) flowers.push({x:+m[1], y:+m[2], col:+m[3]});
+  }
+  // parse big
+  big = {x:64, y:-260};
+  let bigMatch = text.match(/big=\{x=(-?\d+),y=(-?\d+)/);
+  if (bigMatch) big = {x:+bigMatch[1], y:+bigMatch[2]};
+  selected = null;
+  draw();
+}
+
+// ── Clear ──
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (confirm('Clear all entities?')) {
+    plants = []; flowers = []; big = {x:64, y:-260}; selected = null;
+    draw();
+  }
+});
+
+// ── Init ──
+draw();
+</script>
+</body>
+</html>
