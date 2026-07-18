@@ -4,12 +4,22 @@ __lua__
 -- loneliness
 -- state
 state="splash"
+-- intro: typewriter text screen between splash and play
+intro_text="\^w\^tほたる"
+intro_letter_f=12  -- frames per letter reveal
+intro_hold_f=60   -- hold after full text before fade (2s)
+intro_fade_f=30   -- fade-out duration
+intro_t=0
+-- fade-in: dithered black overlay thins out when play starts
+fade_in_f=60  -- total fade-in duration
+fade_t=0      -- runtime counter (counts up during play fade-in)
 px=64 py=84
 spd=1 fc=0 jx=0 jy=0
 g0b=10 g1b=8 g2b=6
 g0=10 g1=5 g2=4
 glow_growth=4
-att_sp=0.2
+att_sp=0.08 att_max=1.5
+att_lose_range=90
 npc_fillp=▒
 flee_range=24
 flee_sp=1.4
@@ -21,6 +31,10 @@ flower_orbit_r=10
 flower_burst_r=80
 flower_burst_s=8
 flower_absorb_r=50
+-- call: radial wave on btnp(O), attaches matching npcs / flees others
+call_speed=2
+call_max_r=50
+call_cd=30
 -- big npc
 steal_range=56
 steal_interval=15
@@ -47,10 +61,13 @@ function set_music_layers(att)
  end
 end
 
-pcol=12
+pcol=6 -- start white; matching-color npcs attract, others flee
+glow_cols={[12]=1,[8]=2,[6]=13,[14]=2} -- [main]=outer glow color
+pcol2=glow_cols[pcol] or pcol
 function set_player_color(c)
  if c==pcol then return end
  pcol=c
+ pcol2=glow_cols[c] or c
  for n in all(npcs) do
   if n.col==c then
    n.fleeing=false
@@ -73,29 +90,8 @@ function set_player_color(c)
  set_music_layers(att)
 end
 
--- npcs
-npcs={
- {x=48,y=20,jx=0,jy=0,att=false,col=12,repel=false,stolen=false},
- {x=104,y=90,jx=0,jy=0,att=false,col=12,repel=false,stolen=false},
- {x=64,y=-40,jx=0,jy=0,att=false,col=8,repel=true,stolen=false},
- {x=40,y=-120,jx=0,jy=0,att=false,col=14,repel=true,stolen=false},
- {x=90,y=-200,jx=0,jy=0,att=false,col=11,repel=true,stolen=false},
-}
--- big npc: passive thief, steals attached NPCs, retreats when att=0
-big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
--- grass tufts next to each NPC spawn (sprite 7, world space, col 2 base glow)
-grass={}
-for i,n in ipairs(npcs) do
- grass[i]={x=n.x+12,y=n.y}
-end
--- flowers: sprite 9, world space, changes player color on hold X
-flowers={
- {x=30,y=-30,col=12,used=false},
- {x=80,y=-80,col=8,used=false},
- {x=50,y=-160,col=14,used=false},
- {x=90,y=-240,col=11,used=false},
-}
 rings={}
+call={active=false,r=0,hit={},cd=0} -- player radial call wave
 
 -- pollen
 pollen={}
@@ -112,11 +108,20 @@ end
 function _update()
  fc+=1
  if state=="splash" then
-   if fc>=60 or btnp(4) or btnp(5) or btnp(0) or btnp(1) or btnp(2) or btnp(3) then
-    state="play"
-    set_music_layers(0) -- soundtrack: bass only at start
-    music(0,1)
-   end
+  if fc>=60 then
+   state="intro" intro_t=0
+  end
+  return
+ end
+ if state=="intro" then
+  intro_t+=1
+  local full=#intro_text*intro_letter_f
+  local fade_end=full+intro_hold_f+intro_fade_f
+  if intro_t>=fade_end then
+   state="play" fade_t=0
+   set_music_layers(0) -- soundtrack: bass only at start
+   music(0,1)
+  end
   return
  end
  -- flower charge freezes player + handles charge
@@ -208,7 +213,42 @@ function _update()
     pollen_deficit-=1
    end
   end
-  local norbit=0 for m in all(npcs) do if not m.repel and not m.stolen then norbit+=1 end end
+ -- call wave: btnp(O) emits radial wave; matching npcs attach, others flee
+ if call.cd>0 then call.cd-=1 end
+ if btnp(4) and not call.active and call.cd<=0 then
+  call.active=true call.r=0 call.hit={}
+ end
+ if call.active then
+  call.r+=call_speed
+  for n in all(npcs) do
+   if not n.stolen and not call.hit[n] then
+    local dx,dy=px-n.x,py-n.y
+    local d=sqrt(dx*dx+dy*dy)
+    if d<=call.r then
+     call.hit[n]=true
+     if n.col==pcol then
+      if not n.att then
+       n.att=true n.att_fc=fc big.sc=0
+       add(rings,{r=8,a=12})
+       sfx(51) --attach chime
+       local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+       set_music_layers(att)
+      end
+     elseif not n.fleeing and d>0.001 then
+      n.fleeing=true
+      local fx,fy=(n.x-px)/d,(n.y-py)/d
+      if fy<0 and abs(fx)<0.001 then fx=1 end
+      local fl=sqrt(fx*fx+fy*fy)
+      if fl>0.001 then fx=fx/fl fy=fy/fl end
+      n.fdx=fx n.fdy=fy
+      sfx(52)
+     end
+    end
+   end
+  end
+  if call.r>=call_max_r then call.active=false call.cd=call_cd end
+ end
+  local norbit=0 for m in all(npcs) do if m.col==pcol and not m.stolen then norbit+=1 end end
   local scount=0 for m in all(npcs) do if m.stolen then scount+=1 end end
   local si=0
   local oi=0
@@ -225,7 +265,7 @@ function _update()
     else
     local dx,dy=px-n.x,py-n.y
     local d=sqrt(dx*dx+dy*dy)
-     if n.repel then
+     if n.col!=pcol then -- non-matching color flees
        if not n.fleeing and d<flee_range and d>0.001 then
         n.fleeing=true
         local fx,fy=(n.x-px)/d,(n.y-py)/d
@@ -244,26 +284,21 @@ function _update()
      end
     else
      oi+=1
-     if d<40 or n.att then
-      local a=fc*0.008+(oi-1)/norbit
-      local tx,ty=px+cos(a)*16,py+sin(a)*16
-      local sp = n.att and att_sp or 0.05
-      local mvx,mvy=(tx-n.x)*sp,(ty-n.y)*sp
-      local mvl=sqrt(mvx*mvx+mvy*mvy)
-      if mvl>2 then mvx*=2/mvl mvy*=2/mvl end
-      n.x+=mvx
-      n.y+=mvy
-      if not n.att and d<20 then
-       n.att=true
-       n.att_fc=fc
-       big.sc=0
-       add(rings,{r=8,a=12})
-       sfx(51) --attach chime
-        -- soundtrack: unmute layer per attached NPC
-        local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
-        set_music_layers(att)
+     if n.att then
+      if d>att_lose_range then
+       n.att=false -- lost contact, drift free; re-attach on next wave
+       local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+       set_music_layers(att)
+      else
+       local a=fc*0.008+(oi-1)/norbit
+       local tx,ty=px+cos(a)*16,py+sin(a)*16
+       local mvx,mvy=(tx-n.x)*att_sp,(ty-n.y)*att_sp
+       local mvl=sqrt(mvx*mvx+mvy*mvy)
+       if mvl>att_max then mvx*=att_max/mvl mvy*=att_max/mvl end
+       n.x+=mvx
+       n.y+=mvy
       end
-    end
+     end
    end
   end
  end
@@ -333,6 +368,7 @@ function _update()
    big.jx=flr(rnd(3))-1
    big.jy=flr(rnd(3))-1
   end
+ if state=="play" and fade_t<fade_in_f then fade_t+=1 end
  for r in all(rings) do
   r.r+=r.vg or 1.5
   r.a-=1
@@ -348,6 +384,25 @@ function _draw()
   cls(0)
   sspr(0,96,32,32,48,40)
   print("hoshibocchi games",30,80,7)
+  return
+ end
+ -- intro screen: typewriter text, hold, then color-step fade
+ if state=="intro" then
+  cls(0)
+  local full=#intro_text*intro_letter_f
+  local shown=flr(intro_t/intro_letter_f)
+  if shown>#intro_text then shown=#intro_text end
+  local txt=sub(intro_text,1,shown)
+  local col=7
+  local fade_t=intro_t-(full+intro_hold_f)
+  if fade_t>0 then
+   local p=fade_t/intro_fade_f
+   if p>0.33 then col=6 end
+   if p>0.66 then col=5 end
+   if p>0.85 then col=1 end
+   if p>=1 then col=0 end
+  end
+  print(txt,56-#txt*2,62,col)
   return
  end
  -- grass shadows (under glow)
@@ -375,7 +430,7 @@ function _draw()
    g1=g1b+att*glow_growth+rnd(3)-1.5
    g2=g2b+att*glow_growth+rnd(2)-1
   end
-  fillp(░) circfill(cx,cy,g0,pcol)
+  fillp(░) circfill(cx,cy,g0,pcol2)
   fillp(▒) circfill(cx,cy,g1,pcol)
   fillp(0) circfill(cx,cy,g2,pcol)
   -- feedback rings
@@ -385,6 +440,11 @@ function _draw()
    if r.a<3 then col=9 end
    circ(r.x or cx, r.y or cy, r.r, r.col or col)
   end
+ -- call wave
+ if call.active then
+  circ(cx,cy,call.r,pcol)
+  circ(cx,cy,call.r-1,pcol)
+ end
  -- grass sprites (on top of glow)
  for g in all(grass) do
   local sy=g.y-cam_y
@@ -503,6 +563,16 @@ function _draw()
     for p in all(pollen) do
      circfill(p.x,p.y-cam_y,p.p,15)
     end
+   -- fade-in: dithered black overlay thins out over fade_in_f frames
+   if fade_t<fade_in_f then
+    local p=fade_t/fade_in_f
+    if p<0.25 then fillp(0)      -- solid black
+    elseif p<0.5 then fillp(ヌ∧⧗)   -- 75%
+    elseif p<0.75 then fillp(▒)  -- 50%
+    else fillp(░) end            -- 25%
+    rectfill(0,0,127,127,0)
+    fillp(0)
+   end
 end
 -->8
 -- level: infinite ascending corridor
@@ -517,6 +587,28 @@ function update_camera()
  if py>cam_y+120 then py=cam_y+120 end
  px=mid(corridor_l,px,corridor_r)
 end
+
+-- editor:plants=[{"x":24,"y":44,"col":12,"count":2},{"x":101,"y":16,"col":12,"count":1},{"x":98,"y":-72,"col":12,"count":1},{"x":21,"y":-90,"col":12,"count":2}]
+-- npcs
+npcs={
+ {x=24,y=38,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=24,y=50,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=101,y=16,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=98,y=-72,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=21,y=-96,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=21,y=-84,jx=0,jy=0,att=false,col=12,stolen=false},
+}
+-- big npc: passive thief, steals attached npcs, retreats when att=0
+big={x=63,y=-191,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
+-- grass tufts next to each npc spawn (sprite 7, world space, col 2 base glow)
+grass={}
+for i,n in ipairs(npcs) do
+ grass[i]={x=n.x+12,y=n.y}
+end
+-- flowers: sprite 9, world space, changes player color on hold x
+flowers={
+ {x=62,y=-27,col=12,used=false},
+}
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000b00000000000077000000000000000000000000000000000000000000000000000
 00000000700000070000000000000000070000700000000000000000b000030b0000000000777700000000000000000000000000000000000000000000000000

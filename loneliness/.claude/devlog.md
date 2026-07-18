@@ -353,6 +353,107 @@ Living record of completed features. Newest at the bottom. Read at the start of 
 - **How implemented:**
   - Flower charge loop + prompt loop: `abs(fdx)<r and abs(fdy)<r` pre-check before `sqrt`. Same pattern as Big NPC fix.
 
+## Color-Driven Attract/Flee + Start White
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Static `repel` flag removed; attract/flee now derived dynamically from `n.col == pcol`. Player starts white.
+- **What it does:** `pcol=6` (white) default. Matching-color NPCs enter the attract/orbit branch; non-matching flee on contact within `flee_range` (proximity, no cast needed). `norbit` count keys off `m.col==pcol` instead of `not m.repel`. `set_player_color` already handled detach+flee of mismatched attached NPCs — unchanged, now fully correct under the dynamic rule.
+- **How implemented:**
+  - Removed `repel` field from all 5 NPC defs. Col 11 NPC → col 6 so the white pair is live at spawn.
+  - Update loop: `n.col!=pcol` flee branch (was `n.repel`); `norbit` uses `m.col==pcol` (was `not m.repel`).
+  - Col 11 flower → col 6 to match the converted NPC.
+- **Tunables changed:** `pcol=6` (was 12) — start white; matching-color NPCs attract, others flee
+
+## Two-Color Player Glow
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Player glow renders two colors — outer ring uses a secondary color per primary, mid/inner use the primary.
+- **What it does:** `glow_cols` lookup maps primary→outer: blue 12→1, red 8→2, white 6→13, pink 14→2. `pcol2` holds the current outer color; updated in `set_player_color`. Draw: `g0` (outer) uses `pcol2`, `g1`/`g2` use `pcol`.
+- **How implemented:**
+  - `glow_cols={[12]=1,[8]=2,[6]=13,[14]=2}` table + `pcol2=glow_cols[pcol] or pcol` at top.
+  - `set_player_color`: `pcol2=glow_cols[c] or c` after `pcol=c`.
+  - `_draw` glow: `fillp(░) circfill(cx,cy,g0,pcol2)` then `g1`/`g2` in `pcol`.
+- **Tunables added:** `glow_cols` table, `pcol2` — outer glow color paired with `pcol`
+
+## Call Wave Mechanic
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Press O to cast a radial wave from the player; matching-color NPCs attach, non-matching flee. Replaces proximity-based attach. Attached NPCs detach when too far.
+- **What it does:** `btnp(4)` starts an expanding ring (`call.r` grows by `call_speed`/frame) centered on the player. Each NPC is hit once per cast (`call.hit[n]` set); on hit: matching color → `n.att=true` (attach chime, feedback ring, music layer up), non-matching → flee (vector set, flee chime). Wave ends at `call_max_r`, cooldown `call_cd`. Proximity attach removed — only attached NPCs orbit (`if n.att then`). Attached NPCs detach when distance exceeds `att_lose_range` (music layer recount). Orbit lerp clamped by `att_max` so `att_sp` tuning actually bites (old hardcoded `2` clamp saturated the new low `att_sp=0.08`).
+- **How implemented:**
+  - `call={active=false,r=0,hit={},cd=0}` global. `btnp(4)` starts wave if not active and `cd<=0`.
+  - Wave loop: grow `call.r`, per-NPC `d<=call.r` + `not call.hit[n]` gate → attach matching or flee non-matching, set `call.hit[n]=true`.
+  - Orbit branch: `if n.att then` (was `if d<40 or n.att then`); removed auto-attach block (`if not n.att and d<20`).
+  - Detach: `if d>att_lose_range then n.att=false; recount att; set_music_layers(att) end` inside orbit branch.
+  - Lerp clamp: `if mvl>att_max then mvx*=att_max/mvl mvy*=att_max/mvl end` (was hardcoded `2`).
+  - Draw: two `circ` outlines in `pcol` at `call.r` and `call.r-1`, after feedback rings.
+- **Tunables added:**
+  - `call_speed=2` — wave expansion px/frame
+  - `call_max_r=50` — wave max radius
+  - `call_cd=30` — cooldown frames between casts
+  - `att_max=1.5` — max px/frame an attached NPC moves toward orbit slot
+  - `att_lose_range=90` — detach distance (must stay > `call_max_r`)
+- **Tunable changed:** `att_sp` 0.2 → 0.08 — attached NPC lerp speed (slower approach)
+- **Bug fixed:** permanent `n.att` made wave-hit NPCs chase across the map via orbit lerp. Distance-based detach (`att_lose_range`) + clamp tuning (`att_max`) resolved both the infinite-follow and the lunge-speed complaints.
+## Splash Input Lock
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Splash screen can no longer be skipped with buttons; advances only by timer.
+- **What it does:** `_update` splash branch triggers `state="intro"` only on `fc>=60` (2s). All `btnp()` checks removed. `_draw` splash branch unchanged.
+- **How implemented:**
+  - Update splash branch: `if fc>=60 then state="intro" intro_t=0 end` (was `fc>=60 or btnp(4) or ...`).
+
+## Intro Typewriter Screen
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Black screen with centered text typed letter-by-letter, then held, then color-step faded out. Sits between splash and play.
+- **What it does:** After splash, `state="intro"` runs three phases: (1) typewriter reveal at `intro_letter_f` frames/letter, (2) hold for `intro_hold_f` frames at full color, (3) fade over `intro_fade_f` frames stepping color 7→6→5→1→0. Music starts on intro→play transition (splash+intro silent except splash sting). Text centered: `print(txt, 64-#txt*2, 62, col)`.
+- **How implemented:**
+  - `state="intro"` third state. `intro_t` counter incremented in `_update`.
+  - Update: `intro_t+=1`; `full=#intro_text*intro_letter_f`; `fade_end=full+intro_hold_f+intro_fade_f`; on `intro_t>=fade_end` → `state="play" fade_t=0`, `set_music_layers(0)`, `music(0,1)`.
+  - Draw: `cls(0)`, `sub(intro_text,1,shown)` for reveal, color-step fade on `intro_t` progress (no fillp — readable on black). Early `return` keeps play draw untouched.
+- **Tunables added:**
+  - `intro_text="test text"` — the message (edit directly in editor)
+  - `intro_letter_f=8` — frames per letter reveal
+  - `intro_hold_f=60` — hold frames after full text (2s)
+  - `intro_fade_f=30` — fade-out duration
+  - `intro_t=0` — runtime counter
+
+## Scene Fade-In (Dither Dissolve)
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** When play starts, a dithered black overlay thins out to reveal the scene.
+- **What it does:** Over `fade_in_f` frames, a full-screen `rectfill(0,0,127,127,0)` overlay uses fillp patterns that get sparser: solid (`0xff`) → `▓` (`0xee`) → `▒` (`0xaa`) → `░` (`0x55`) → clear. Drawn last in `_draw` (after pollen) so it covers everything. `fade_t` increments in `_update` (gated `state=="play"`), resets to 0 on intro→play. `fillp(0)` reset after overlay so later frames aren't corrupted.
+- **How implemented:**
+  - `fade_t`/`fade_in_f` tunables. `fade_t=0` reset on intro→play transition.
+  - `_update`: `if state=="play" and fade_t<fade_in_f then fade_t+=1 end` (state change in update, not draw — PICO-8 convention).
+  - `_draw`: `if fade_t<fade_in_f then local p=fade_t/fade_in_f; pick pat by quartile; fillp(pat); rectfill(...); fillp(0) end` after pollen loop.
+- **Tunables added:**
+  - `fade_in_f=60` — total fade-in duration (2s @ 30fps)
+  - `fade_t=0` — runtime counter
+## Visual Level Editor (HTML)
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** Self-contained HTML tool (`level_editor.html`) for placing plants/flowers/big-NPC visually and exporting the exact Lua tables for tab 1.
+- **What it does:** Canvas shows world space (y=0..128 = initial screen, dashed; y goes up = negative) with 16px grid + player spawn marker (64,84). Tools: Plant (with NPC count 1-8), Flower, Big NPC, Select. Click to place, click to select, drag to move, Del/Backspace or floating ✕ button to delete. Color picker updates the selected entity live (or sets next-placement color if nothing selected). Plants expand to N NPCs clustered in a circle (radius 6) on export. Grass auto-derives (NPC x+12). Export writes Lua to a textarea + downloads `level_setup.txt`; Copy Code button for direct paste. Load button re-imports a `.txt` (lossless via embedded `-- editor:plants=JSON` metadata; falls back to regex-parsing NPC entries). Seeded with cart's current layout.
+- **How implemented:**
+  - Single file, vanilla JS, no deps. PICO-8 palette hardcoded for entity colors.
+  - `plants[]` with `{x,y,col,count}`; `expandPlants()` builds NPC list on export (count=1 → single NPC; count>1 → circle cluster).
+  - Export format matches cart exactly: `npcs={...}`, `big={...}`, `grass={}` + `for i,n in ipairs(npcs) do` loop, `flowers={...}`.
+  - Floating delete button: red ✕ circle drawn at `(entity_canvas_x + 8*SCALE, entity_canvas_y - 8*SCALE)` when something selected; `deleteBtnHit()` checks click radius.
+  - Color button dual-mode: updates `selected.col` if a plant/flower is selected, else sets `curCol` for next placement.
+  - Count input dual-mode: updates `selected.count` if a plant is selected, else sets `curCount`.
+
+## Entity Tables Moved to Tab 1
+- **Date:** 2026-07-18
+- **Status:** complete
+- **What it is:** `npcs`/`big`/`grass`/`flowers` block relocated from tab 0 to tab 1 so all level positioning lives with the camera/level code.
+- **What it does:** Tab 1 now holds the full level layout: `cam_y`/`corridor_*`/`update_camera()` + entity tables. Tab 0 keeps runtime state (`rings`, `call`, `pollen`) and systems. Editor export pastes cleanly into tab 1 with no duplicate globals.
+- **How implemented:**
+  - Deleted entity block from tab 0 (was lines 93-114).
+  - Inserted after `update_camera()` in tab 1, before `__gfx__`.
+  - `rings`/`call` stayed in tab 0 (runtime state, not level layout).
+  - Added `-- npcs (place via level_editor.html)` comment as the paste target marker.
 ---
 
 ## Lessons Learned (PICO-8 pitfalls)
