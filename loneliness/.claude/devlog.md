@@ -512,3 +512,10 @@ Reference section — not features, but hard-won knowledge for future work.
 ### Ponytail Notes in Code
 - Mark deliberate simplifications/known ceilings with `-- ponytail: [what] [ceiling] [upgrade path]`.
 - Future-self breadcrumbs. Don't over-comment normal code.
+
+## Grass = One Per Plant (Not Per NPC)
+- **Date:** 2026-07-23
+- **Status:** complete
+- **What it is:** Grass tufts now spawn once per level-editor plant, not once per expanded NPC.
+- **What it does:** Fixes "plant count:2 → two grass tufts with one NPC each." Multi-NPC plants now show a single grass tuft at the plant center with their NPC cluster.
+- **How implemented:** Replaced `for i,n in ipairs(npcs) do grass[i]={x=n.x+12,y=n.y} end` with explicit per-plant entries (loneliness.p8:603-608). Editor already fixed in commit `38d5e70` (`grass[i]={x=p.x+12,y=p.y}` indexed by plant, not NPC).
