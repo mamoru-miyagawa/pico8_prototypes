@@ -600,11 +600,12 @@ npcs={
 }
 -- big npc: passive thief, steals attached npcs, retreats when att=0
 big={x=63,y=-191,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
--- grass tufts next to each npc spawn (sprite 7, world space, col 2 base glow)
+-- grass tufts: one per plant (not per npc), matches level_editor export
 grass={}
-for i,n in ipairs(npcs) do
- grass[i]={x=n.x+12,y=n.y}
-end
+grass[1]={x=24+12,y=44}
+grass[2]={x=101+12,y=16}
+grass[3]={x=98+12,y=-72}
+grass[4]={x=21+12,y=-90}
 -- flowers: sprite 9, world space, changes player color on hold x
 flowers={
  {x=62,y=-27,col=12,used=false},
