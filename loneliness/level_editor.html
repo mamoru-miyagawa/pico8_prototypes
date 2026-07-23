@@ -71,6 +71,9 @@
 
   <h3>Actions</h3>
   <div class="actions">
+    <button id="btn-undo">↩ Undo (Ctrl+Z)</button>
+    <button id="btn-redo">↪ Redo (Ctrl+Y)</button>
+    <button id="btn-snap">🧲 Snap to Grid (G): off</button>
     <button id="btn-export">⬇ Export Lua + .txt</button>
     <button id="btn-copy">📋 Copy Code</button>
     <button id="btn-load">📂 Load Setup</button>
@@ -81,10 +84,11 @@
   <h3>Exported Code (paste into tab 1)</h3>
   <textarea id="code-output" readonly></textarea>
   <p class="hint">
-    Click to place. Click entity to select. Drag to move. Del key or ✕ to remove.<br>
-    Selecting a plant/flower then clicking a color updates that entity.<br>
-    Plants expand to N NPCs clustered on export. Grass auto-derives (NPC x+12).<br>
-    Player spawns at (64,84). World Y goes up = negative.
+    Click to place. Click entity to select. Drag to move. Del or ✕ to remove.<br>
+    Shift-click for multi-select. Arrow keys nudge (Shift=8px).<br>
+    1/2/3/4 = tools. G = toggle snap. Ctrl+Z/Y = undo/redo. Ctrl+E = export.<br>
+    Autosaves to localStorage. Plants expand to N NPCs on export. Grass auto-derives.<br>
+    Player spawns at (64,84). World Y up = negative.
   </p>
 </div>
 
@@ -103,7 +107,8 @@ const COL_NAMES = {12:'Blue',8:'Red',6:'White',14:'Pink'};
 let tool = 'plant';
 let curCol = 12;
 let curCount = 1;
-// plants: {x, y, col, count} — each plant expands to `count` NPCs on export
+let snapToGrid = false;
+const SNAP = 16;
 let plants = [
   {x:48, y:20, col:12, count:1},
   {x:104, y:90, col:12, count:1},
@@ -113,8 +118,14 @@ let plants = [
 ];
 let flowers = [{x:30,y:-30,col:12},{x:80,y:-80,col:8},{x:50,y:-160,col:14},{x:90,y:-240,col:6}];
 let big = {x:64, y:-260};
-let selected = null; // {type:'plant'|'flower'|'big', idx}
+let selected = null;   // primary single selection {type, idx}
+let multiSel = [];     // additional multi-selected entries
 let dragging = false;
+let dragMoved = false;
+let undoStack = [];
+let redoStack = [];
+const STACK_MAX = 50;
+const AUTOSAVE_KEY = 'loneliness_editor_v1';
 
 // ── Canvas setup ──
 const SCALE = 3;
@@ -127,6 +138,91 @@ canvas.height = WH * SCALE;
 
 const w2c = (wx, wy) => [wx * SCALE, (wy - WORLD_TOP) * SCALE];
 const c2w = (cx, cy) => [Math.round(cx / SCALE), Math.round(cy / SCALE) + WORLD_TOP];
+
+// ── Snap ──
+function snapV(v) { return snapToGrid ? Math.round(v / SNAP) * SNAP : v; }
+function snapW(wx, wy) { return [snapV(wx), snapV(wy)]; }
+
+// ── Snapshot / undo / redo ──
+function stateSnapshot() {
+  return {
+    plants: plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count})),
+    flowers: flowers.map(f => ({x:f.x, y:f.y, col:f.col})),
+    big: {x: big.x, y: big.y}
+  };
+}
+function restoreState(s) {
+  plants = s.plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count}));
+  flowers = s.flowers.map(f => ({x:f.x, y:f.y, col:f.col}));
+  big = {x: s.big.x, y: s.big.y};
+}
+function pushUndo() {
+  undoStack.push(stateSnapshot());
+  if (undoStack.length > STACK_MAX) undoStack.shift();
+  redoStack = [];
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(stateSnapshot());
+  restoreState(undoStack.pop());
+  clearSelection();
+  draw();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(stateSnapshot());
+  restoreState(redoStack.pop());
+  clearSelection();
+  draw();
+}
+
+// ── Autosave ──
+function saveAutosave() {
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(stateSnapshot())); } catch(e) {}
+}
+function loadAutosave() {
+  try {
+    let s = localStorage.getItem(AUTOSAVE_KEY);
+    if (!s) return false;
+    let p = JSON.parse(s);
+    if (p && p.plants && p.flowers && p.big) { restoreState(p); return true; }
+  } catch(e) {}
+  return false;
+}
+
+// ── Selection helpers ──
+function clearSelection() { selected = null; multiSel = []; }
+function inSelection(type, idx) {
+  return (selected && selected.type===type && selected.idx===idx) ||
+         multiSel.some(s => s.type===type && s.idx===idx);
+}
+function allSelection() {
+  let arr = [];
+  if (selected) arr.push(selected);
+  for (let m of multiSel) {
+    if (!arr.some(s => s.type===m.type && s.idx===m.idx)) arr.push(m);
+  }
+  return arr;
+}
+function deleteSelection() {
+  let sel = allSelection();
+  let pd = sel.filter(s => s.type==='plant').map(s => s.idx).sort((a,b)=>b-a);
+  let fd = sel.filter(s => s.type==='flower').map(s => s.idx).sort((a,b)=>b-a);
+  pd.forEach(i => plants.splice(i, 1));
+  fd.forEach(i => flowers.splice(i, 1));
+  clearSelection();
+}
+function nudge(dx, dy) {
+  let sel = allSelection();
+  if (!sel.length) return;
+  pushUndo();
+  sel.forEach(s => {
+    if (s.type === 'plant') { plants[s.idx].x += dx; plants[s.idx].y += dy; }
+    else if (s.type === 'flower') { flowers[s.idx].x += dx; flowers[s.idx].y += dy; }
+    else if (s.type === 'big') { big.x += dx; big.y += dy; }
+  });
+  draw();
+}
 
 // ── Expand plants to NPC entries (for export) ──
 function expandPlants() {
@@ -155,7 +251,7 @@ function draw() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // grid every 16px
-  ctx.strokeStyle = '#1a1a2e';
+  ctx.strokeStyle = snapToGrid ? '#29adff33' : '#1a1a2e';
   ctx.lineWidth = 1;
   for (let x = 0; x <= 128; x += 16) {
     let [cx] = w2c(x, 0);
@@ -185,12 +281,10 @@ function draw() {
   // Plants (grass tuft + NPC cluster preview)
   plants.forEach((p, i) => {
     let [cx, cy] = w2c(p.x, p.y);
-    // grass tuft icon (green)
     ctx.fillStyle = '#008751';
     ctx.fillRect(cx - SCALE*2, cy - SCALE*2, SCALE*4, SCALE*4);
     ctx.fillStyle = '#00E436';
     ctx.fillRect(cx - SCALE, cy - SCALE, SCALE*2, SCALE*2);
-    // NPC cluster preview dots
     if (p.count > 1) {
       let r = 6;
       for (let j = 0; j < p.count; j++) {
@@ -203,12 +297,15 @@ function draw() {
       ctx.fillStyle = PAL[p.col];
       ctx.beginPath(); ctx.arc(cx + SCALE*3, cy, SCALE*2, 0, Math.PI*2); ctx.fill();
     }
-    // count label
-    ctx.fillStyle = '#FFEC27'; ctx.font = '9px monospace';
+    // count label in plant color
+    ctx.fillStyle = PAL[p.col]; ctx.font = 'bold 9px monospace';
     ctx.fillText('×' + p.count, cx + SCALE*4, cy - SCALE*4);
-    // selection highlight
+    // selection highlight — yellow primary, cyan multi
     if (selected && selected.type === 'plant' && selected.idx === i) {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
+      ctx.strokeRect(cx - SCALE*5, cy - SCALE*5, SCALE*10, SCALE*10);
+    } else if (multiSel.some(s => s.type==='plant' && s.idx===i)) {
+      ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
       ctx.strokeRect(cx - SCALE*5, cy - SCALE*5, SCALE*10, SCALE*10);
     }
   });
@@ -223,8 +320,14 @@ function draw() {
     }
     ctx.fillStyle = '#FFEC27';
     ctx.beginPath(); ctx.arc(cx, cy, SCALE*1.5, 0, Math.PI*2); ctx.fill();
+    // color dot badge top-left
+    ctx.fillStyle = PAL[f.col];
+    ctx.beginPath(); ctx.arc(cx - SCALE*6, cy - SCALE*6, SCALE*1.5, 0, Math.PI*2); ctx.fill();
     if (selected && selected.type === 'flower' && selected.idx === i) {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, SCALE*7, 0, Math.PI*2); ctx.stroke();
+    } else if (multiSel.some(s => s.type==='flower' && s.idx===i)) {
+      ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, cy, SCALE*7, 0, Math.PI*2); ctx.stroke();
     }
   });
@@ -239,15 +342,17 @@ function draw() {
     if (selected && selected.type === 'big') {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
       ctx.strokeRect(cx - SCALE*10, cy - SCALE*10, SCALE*20, SCALE*20);
+    } else if (multiSel.some(s => s.type==='big')) {
+      ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
+      ctx.strokeRect(cx - SCALE*10, cy - SCALE*10, SCALE*20, SCALE*20);
     }
   }
 
-  // Floating delete button near selected
-  if (selected) {
+  // Floating delete button near primary selection (only when single selection)
+  if (selected && !multiSel.length) {
     let e = getSelectedEntity();
     let [cx, cy] = w2c(e.x, e.y);
     let bx = cx + SCALE*8, by = cy - SCALE*8;
-    // red circle with ✕
     ctx.fillStyle = '#FF004D';
     ctx.beginPath(); ctx.arc(bx, by, SCALE*4, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 2;
@@ -258,6 +363,7 @@ function draw() {
   }
 
   updateInfo();
+  saveAutosave();
 }
 
 function getSelectedEntity() {
@@ -272,19 +378,21 @@ function updateInfo() {
   document.getElementById('plant-count').textContent = plants.length;
   document.getElementById('flower-count').textContent = flowers.length;
   let e = getSelectedEntity();
+  let selTxt = 'none';
   if (e) {
     let countStr = selected.type === 'plant' ? ' ×' + e.count : '';
-    document.getElementById('sel-info').textContent = `${selected.type} (${e.x},${e.y})${countStr}`;
-  } else {
-    document.getElementById('sel-info').textContent = 'none';
+    selTxt = `${selected.type} (${e.x},${e.y})${countStr}`;
+    if (multiSel.length) selTxt += ` +${multiSel.length} more`;
+  } else if (multiSel.length) {
+    selTxt = `${multiSel.length} selected`;
   }
-  // update count input context
-  let ctx = document.getElementById('count-context');
+  document.getElementById('sel-info').textContent = selTxt;
+  let ctxEl = document.getElementById('count-context');
   if (selected && selected.type === 'plant') {
-    ctx.textContent = '(selected plant)';
+    ctxEl.textContent = '(selected plant)';
     document.getElementById('npc-count-input').value = plants[selected.idx].count;
   } else {
-    ctx.textContent = '(next plant)';
+    ctxEl.textContent = '(next plant)';
   }
 }
 
@@ -304,7 +412,7 @@ function hitTest(wx, wy) {
 
 // ── Delete button hit test (in canvas coords) ──
 function deleteBtnHit(clickCX, clickCY) {
-  if (!selected) return false;
+  if (!selected || multiSel.length) return false;
   let e = getSelectedEntity();
   let [cx, cy] = w2c(e.x, e.y);
   let bx = cx + SCALE*8, by = cy - SCALE*8;
@@ -317,69 +425,115 @@ canvas.addEventListener('mousedown', e => {
   let rect = canvas.getBoundingClientRect();
   let clickCX = e.clientX - rect.left, clickCY = e.clientY - rect.top;
   let [wx, wy] = c2w(clickCX, clickCY);
+  [wx, wy] = snapW(wx, wy);
 
-  // check delete button first
   if (deleteBtnHit(clickCX, clickCY)) {
-    deleteSelected();
+    pushUndo();
+    deleteSelection();
     draw();
     return;
   }
 
   let hit = hitTest(wx, wy);
   if (hit) {
-    selected = hit;
+    if (e.shiftKey) {
+      if (inSelection(hit.type, hit.idx)) {
+        if (selected && selected.type===hit.type && selected.idx===hit.idx) {
+          selected = multiSel.length ? multiSel.pop() : null;
+        } else {
+          multiSel = multiSel.filter(s => !(s.type===hit.type && s.idx===hit.idx));
+        }
+      } else {
+        multiSel.push(hit);
+      }
+    } else {
+      selected = hit;
+      multiSel = [];
+    }
     dragging = true;
   } else if (tool === 'plant') {
+    pushUndo();
     plants.push({x: wx, y: wy, col: curCol, count: curCount});
     selected = {type:'plant', idx: plants.length - 1};
-    dragging = true;
+    multiSel = [];
+    dragging = true; dragMoved = true;
   } else if (tool === 'flower') {
+    pushUndo();
     flowers.push({x: wx, y: wy, col: curCol});
     selected = {type:'flower', idx: flowers.length - 1};
-    dragging = true;
+    multiSel = [];
+    dragging = true; dragMoved = true;
   } else if (tool === 'big') {
+    pushUndo();
     big.x = wx; big.y = wy;
     selected = {type:'big', idx:0};
-    dragging = true;
+    multiSel = [];
+    dragging = true; dragMoved = true;
   } else {
-    selected = null;
+    if (!e.shiftKey) clearSelection();
   }
   draw();
 });
 
 canvas.addEventListener('mousemove', e => {
   if (!dragging || !selected) return;
+  if (!dragMoved) { pushUndo(); dragMoved = true; }
   let rect = canvas.getBoundingClientRect();
   let [wx, wy] = c2w(e.clientX - rect.left, e.clientY - rect.top);
+  [wx, wy] = snapW(wx, wy);
   if (selected.type === 'plant') plants[selected.idx].x = wx, plants[selected.idx].y = wy;
   else if (selected.type === 'flower') flowers[selected.idx].x = wx, flowers[selected.idx].y = wy;
   else if (selected.type === 'big') big.x = wx, big.y = wy;
   draw();
 });
 
-canvas.addEventListener('mouseup', () => { dragging = false; });
+canvas.addEventListener('mouseup', () => { dragging = false; dragMoved = false; });
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
   let rect = canvas.getBoundingClientRect();
   let [wx, wy] = c2w(e.clientX - rect.left, e.clientY - rect.top);
   let hit = hitTest(wx, wy);
-  if (hit) { selected = hit; deleteSelected(); }
-});
-
-// ── Delete ──
-function deleteSelected() {
-  if (!selected) return;
-  if (selected.type === 'plant') plants.splice(selected.idx, 1);
-  else if (selected.type === 'flower') flowers.splice(selected.idx, 1);
-  selected = null;
-}
-
-document.addEventListener('keydown', e => {
-  if ((e.key === 'Delete' || e.key === 'Backspace') && selected && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-    e.preventDefault();
-    deleteSelected();
+  if (hit) {
+    pushUndo();
+    selected = hit; multiSel = [];
+    deleteSelection();
     draw();
   }
+});
+
+// ── Keyboard ──
+document.addEventListener('keydown', e => {
+  let inField = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+  let mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z' && !inField) {
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'y' && !inField) { e.preventDefault(); redo(); return; }
+  if (mod && e.key.toLowerCase() === 'e' && !inField) { e.preventDefault(); document.getElementById('btn-export').click(); return; }
+  if (mod && e.key.toLowerCase() === 'c' && !inField && !window.getSelection().toString()) {
+    e.preventDefault(); document.getElementById('btn-copy').click(); return;
+  }
+  if (inField) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selected || multiSel.length) {
+      e.preventDefault(); pushUndo(); deleteSelection(); draw();
+    }
+    return;
+  }
+  if (e.key >= '1' && e.key <= '4') {
+    let tools = ['plant','flower','big','select'];
+    let btn = document.querySelector(`.tools button[data-tool="${tools[+e.key-1]}"]`);
+    if (btn) btn.click();
+    return;
+  }
+  if (e.key.toLowerCase() === 'g') { document.getElementById('btn-snap').click(); return; }
+  let n = e.shiftKey ? 8 : 1;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-n, 0); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(n, 0); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); nudge(0, -n); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); nudge(0, n); }
 });
 
 // ── Tool buttons ──
@@ -397,11 +551,9 @@ document.querySelectorAll('.colors button').forEach(b => {
   b.addEventListener('click', () => {
     let col = parseInt(b.dataset.col);
     if (selected && (selected.type === 'plant' || selected.type === 'flower')) {
-      // update selected entity's color
-      let e = getSelectedEntity();
-      e.col = col;
+      pushUndo();
+      getSelectedEntity().col = col;
     } else {
-      // set next-placement color
       document.querySelectorAll('.colors button').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
       curCol = col;
@@ -412,10 +564,14 @@ document.querySelectorAll('.colors button').forEach(b => {
 });
 
 // ── Count input: update selected plant OR set next-placement count ──
-document.getElementById('npc-count-input').addEventListener('input', e => {
+let countInput = document.getElementById('npc-count-input');
+let countDirty = false;
+countInput.addEventListener('focus', () => { countDirty = false; });
+countInput.addEventListener('input', e => {
   let v = Math.max(1, Math.min(8, parseInt(e.target.value) || 1));
   e.target.value = v;
   if (selected && selected.type === 'plant') {
+    if (!countDirty) { pushUndo(); countDirty = true; }
     plants[selected.idx].count = v;
   } else {
     curCount = v;
@@ -423,11 +579,19 @@ document.getElementById('npc-count-input').addEventListener('input', e => {
   draw();
 });
 
+// ── Undo / Redo / Snap buttons ──
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+document.getElementById('btn-snap').addEventListener('click', () => {
+  snapToGrid = !snapToGrid;
+  document.getElementById('btn-snap').textContent = `🧲 Snap to Grid (G): ${snapToGrid ? 'on' : 'off'}`;
+  draw();
+});
+
 // ── Export ──
 function generateLua() {
   let npcList = expandPlants();
   let lines = [];
-  // metadata comment for lossless re-import (ignored by PICO-8)
   let meta = JSON.stringify(plants.map(p => ({x:p.x,y:p.y,col:p.col,count:p.count})));
   lines.push('-- editor:plants=' + meta);
   lines.push('-- npcs');
@@ -438,11 +602,11 @@ function generateLua() {
   lines.push('}');
   lines.push('-- big npc: passive thief, steals attached NPCs, retreats when att=0');
   lines.push(`big={x=${big.x},y=${big.y},done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}`);
-  lines.push('-- grass tufts next to each NPC spawn (sprite 7, world space, col 2 base glow)');
+  lines.push('-- grass tufts next to each spawner (sprite 7, world space, col 2 base glow)');
   lines.push('grass={}');
-  lines.push('for i,n in ipairs(npcs) do');
-  lines.push(' grass[i]={x=n.x+12,y=n.y}');
-  lines.push('end');
+  plants.forEach((p, i) => {
+    lines.push(`grass[${i+1}]={x=${p.x}+12,y=${p.y}}`);
+  });
   lines.push('-- flowers: sprite 9, world space, changes player color on hold X');
   lines.push('flowers={');
   flowers.forEach(f => {
@@ -465,6 +629,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
 
 document.getElementById('btn-copy').addEventListener('click', () => {
   let ta = document.getElementById('code-output');
+  if (!ta.value) ta.value = generateLua();
   ta.select();
   document.execCommand('copy');
 });
@@ -482,7 +647,7 @@ document.getElementById('file-input').addEventListener('change', e => {
 });
 
 function parseLua(text) {
-  // try metadata comment first (lossless)
+  pushUndo();
   let metaMatch = text.match(/-- editor:plants=(\[[\s\S]*?\])/);
   if (metaMatch) {
     try {
@@ -490,7 +655,6 @@ function parseLua(text) {
       plants = parsed.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count}));
     } catch(e) { plants = []; }
   } else {
-    // fallback: parse npc entries, each becomes count=1 plant
     plants = [];
     let npcMatch = text.match(/npcs=\{([\s\S]*?)\}/);
     if (npcMatch) {
@@ -499,7 +663,6 @@ function parseLua(text) {
       while ((m = re.exec(npcMatch[1]))) plants.push({x:+m[1], y:+m[2], col:+m[3], count:1});
     }
   }
-  // parse flowers
   flowers = [];
   let flMatch = text.match(/flowers=\{([\s\S]*?)\}/);
   if (flMatch) {
@@ -507,23 +670,24 @@ function parseLua(text) {
     let m;
     while ((m = re.exec(flMatch[1]))) flowers.push({x:+m[1], y:+m[2], col:+m[3]});
   }
-  // parse big
   big = {x:64, y:-260};
   let bigMatch = text.match(/big=\{x=(-?\d+),y=(-?\d+)/);
   if (bigMatch) big = {x:+bigMatch[1], y:+bigMatch[2]};
-  selected = null;
+  clearSelection();
   draw();
 }
 
 // ── Clear ──
 document.getElementById('btn-clear').addEventListener('click', () => {
   if (confirm('Clear all entities?')) {
-    plants = []; flowers = []; big = {x:64, y:-260}; selected = null;
+    pushUndo();
+    plants = []; flowers = []; big = {x:64, y:-260}; clearSelection();
     draw();
   }
 });
 
 // ── Init ──
+loadAutosave();
 draw();
 </script>
 </body>
