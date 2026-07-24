@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gdd_toolkit/README.md",
+                "file": "GDD.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "GDD"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "gdd_toolkit/README.md",
+                "file": "GDD.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for README"
+              "title": "Backlinks for GDD"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "gdd_toolkit/README.md",
+                "file": "GDD.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from README"
+              "title": "Outgoing links from GDD"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "gdd_toolkit/README.md",
+                "file": "GDD.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of README"
+              "title": "Outline of GDD"
             }
           }
         ]
@@ -185,10 +185,12 @@
   },
   "active": "20dda0ad94daa2b5",
   "lastOpenFiles": [
+    "musicmachine-0.p8.png",
     "GDD.md",
+    "gdd_toolkit/HANDOFF.md",
+    "gdd_toolkit/README.md",
     "CLAUDE.md",
     "spritesheet.png",
-    "musicmachine-0.p8.png",
     "gdd_toolkit/hermes-skill/references/failure-modes.md",
     "gdd_toolkit/hermes-skill/references/flowcharts.md",
     "gdd_toolkit/hermes-skill/templates/obsidian-vault-layout.md"

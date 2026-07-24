@@ -59,3 +59,18 @@
 **Alternatives rejected:** "Keep both copies" — drift risk, contradicts single-source-of-truth principle. "Editor writes derived grass explicitly" — derivative data, editor should emit source only.
 **Tensions:** none.
 **Override:** none.
+
+## 2026-07-24 (8)
+**Decision:** Updated GDD + sidecar to skill v2.2.0 directives.
+**Changes:**
+1. GDD refactored from monolith (880 lines with inline code/formulas/state machines) to wiki-style (summaries + links to `.design-context/systems/` files). Code, formulas, technical specs removed from GDD — system files are the deeper docs.
+2. Technical Requirements section added to GDD — PICO-8 specifics (fixed-point overflow, cart format, build pipeline) consolidated there.
+3. Balance & Tuning section rewritten as intent + relationships prose, not number tables. Per-system tuning tables stay in system files.
+4. Pillar anatomy migrated: old (Statement/Enables/Forbids/Verify) → v2.2.0 (Principle/Guides decisions/Pushes against). "How we verify" dropped — pillars are lenses, not testable hypotheses. "Enables" folded into "Guides decisions".
+5. Terminology: "forbids" → "pushes against", "violation" → "conflict" throughout pillars, tensions, GDD.
+6. Code change queue extracted from `index.md` to own file `code-change-queue.md` (per v2.2.0 bundle spec). 13 items categorized by priority.
+7. `index.md` updated to reflect new structure.
+**Rationale:** Skill v2.2.0 landed directives that the existing GDD violated: wiki-not-monolith, plain language in GDD, tuning = intent not numbers, new pillar anatomy, code change queue as own file. Updated to comply.
+**Alternatives rejected:** Keep old GDD monolith — contradicts v2.2.0 wiki directive. Keep "How we verify" in pillars — v2.2.0 treats pillars as lenses, not hypotheses. Leave code queue in index — v2.2.0 bundle spec has it as own file.
+**Tensions:** none new.
+**Override:** none.
