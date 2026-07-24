@@ -60,6 +60,18 @@
 **Tensions:** none.
 **Override:** none.
 
+## 2026-07-24 (9)
+**Decision:** Ran pairwise matrix (28 pairs) + MDA analysis on core loop.
+**Matrix:** 19 ✅ documented, 9 ⚠ open, 0 undocumented. All open pairs map to existing code-change-queue items — 5 of 9 trace to one root (overflow guards). No unknown-unknowns. Saved to `pairwise-matrix.md`.
+**MDA:** Primary aesthetics = Sensation + Discovery + Expression. Suppressed = Fellowship, Submission, heavy Narrative. Core loop MDA matches pillars — no pillar-pillar denial at aesthetic level.
+**Gaps surfaced (all map to existing OQs):**
+- Narrative aesthetic under-served (2/5) — confirms OQ4 (ending beat) is load-bearing, not optional.
+- Expression ceiling at 4 colors — late-game agency drops. Couples to ending design (OQ4).
+- Musical ceiling vs unbounded glow — already in tensions.md.
+**Recommendation:** prioritize OQ4 ending beat design. MDA confirms it's the weakest leg of the aesthetic profile and the load-bearing fix for narrative intent.
+**Tensions:** none new. P1↔P3 (loss + ascent = empty late game) confirmed at aesthetic level — Narrative gap. Already tracked.
+**Override:** none.
+
 ## 2026-07-24 (8)
 **Decision:** Updated GDD + sidecar to skill v2.2.0 directives.
 **Changes:**

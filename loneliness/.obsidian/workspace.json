@@ -183,14 +183,14 @@
       "bases:Create new base": false
     }
   },
-  "active": "20dda0ad94daa2b5",
+  "active": "c1df57b06a7e9213",
   "lastOpenFiles": [
+    "spritesheet.png",
     "musicmachine-0.p8.png",
     "GDD.md",
     "gdd_toolkit/HANDOFF.md",
     "gdd_toolkit/README.md",
     "CLAUDE.md",
-    "spritesheet.png",
     "gdd_toolkit/hermes-skill/references/failure-modes.md",
     "gdd_toolkit/hermes-skill/references/flowcharts.md",
     "gdd_toolkit/hermes-skill/templates/obsidian-vault-layout.md"

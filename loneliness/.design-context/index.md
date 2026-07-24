@@ -4,6 +4,8 @@
 **GDD status:** `GDD.md` at project root, wiki-style (summaries + links to system files). Updated to v2.2.0 skill spec 2026-07-24.
 **Last code audit:** none
 **Last design review:** none
+**Pairwise matrix:** `pairwise-matrix.md` — 28 pairs, 19 ✅, 9 ⚠, 0 undocumented
+**MDA analyses:** `mda-analyses/core-loop.md` — core loop profile matches pillars, 3 gaps (all mapped to OQ4)
 **Systems:** 8 files at `.design-context/systems/01-*.md` through `08-*.md`
 **Open questions:** 8 (see `open-questions.md`)
 **Active tensions:** 2 (P1↔P3 one-way arc, P2↔T2 flower prompt)
