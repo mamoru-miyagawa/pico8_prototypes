@@ -1,65 +1,159 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Loneliness — Level Editor</title>
+<title>ほたる - Loneliness - Level Editor</title>
 <style>
+  :root {
+    --paper: #f4f1ea;
+    --ink: #2b2b2b;
+    --red: #e1341e;
+    --blue: #2942ff;
+    --shadow: 4px 4px 0 var(--ink);
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { display: flex; font-family: monospace; background: #1a1a2e; color: #c2c3c7; height: 100vh; overflow: hidden; }
-  #sidebar { width: 340px; padding: 16px; overflow-y: auto; border-right: 1px solid #333; flex-shrink: 0; }
-  #sidebar h2 { font-size: 14px; margin-bottom: 12px; color: #29adff; }
-  #sidebar h3 { font-size: 11px; margin: 16px 0 6px; color: #83769c; text-transform: uppercase; letter-spacing: 1px; }
-  .tools, .colors { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-  .tools button, .colors button, .actions button {
-    padding: 6px 10px; border: 1px solid #333; background: #222; color: #c2c3c7;
-    cursor: pointer; font-family: monospace; font-size: 11px; border-radius: 3px;
+  body {
+    display: flex; height: 100vh; overflow: hidden;
+    font-family: "Courier New", monospace;
+    background: var(--paper); color: var(--ink);
   }
-  .tools button.active, .colors button.active { border-color: #29adff; background: #1d2b53; }
-  .colors button { min-width: 60px; text-align: left; }
-  .colors button span { color: #000; padding: 0 4px; border-radius: 2px; }
-  .actions { display: flex; flex-direction: column; gap: 4px; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 400px; padding: 20px; overflow-y: auto; flex-shrink: 0;
+    background: var(--paper);
+    border-right: 3px solid var(--ink);
+  }
+  #sidebar h2 {
+    font-size: 20px; font-weight: bold; letter-spacing: 1px;
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 3px solid var(--ink);
+  }
+  #sidebar h2 .jp { color: var(--red); }
+  #sidebar h3 {
+    font-size: 13px; font-weight: bold; letter-spacing: 2px;
+    margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
+  }
+  #sidebar h3::before {
+    content: ""; display: inline-block; width: 12px; height: 12px;
+    background: var(--red); border: 2px solid var(--ink); flex-shrink: 0;
+  }
+  #sidebar h3 .jp { font-weight: normal; color: #777; letter-spacing: 1px; }
+
+  .tools, .colors { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .tools button, .colors button, .actions button, .zoom-row button {
+    padding: 10px 14px; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: bold;
+    background: #fff; color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 0;
+    box-shadow: 3px 3px 0 var(--ink);
+    min-height: 44px;
+    transition: transform .05s, box-shadow .05s;
+  }
+  .tools button:hover, .colors button:hover, .actions button:hover, .zoom-row button:hover {
+    background: #ffe9e5;
+  }
+  .tools button:active, .colors button:active, .actions button:active, .zoom-row button:active {
+    transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink);
+  }
+  .tools button.active, .colors button.active {
+    background: var(--ink); color: var(--paper);
+  }
+  .tools button .jp { color: var(--red); margin-right: 4px; }
+  .tools button.active .jp { color: #ff8a75; }
+  .colors button { min-width: 96px; text-align: left; }
+  .colors button span {
+    display: inline-block; width: 18px; height: 18px;
+    border: 2px solid var(--ink); vertical-align: -4px; margin-right: 6px;
+  }
+
+  .actions { display: flex; flex-direction: column; gap: 8px; }
   .actions button { text-align: left; }
-  #btn-clear { border-color: #ff004d; color: #ff77a8; }
-  .info { font-size: 11px; line-height: 1.8; margin: 12px 0; padding: 8px; background: #111; border-radius: 4px; }
-  .info span { color: #29adff; }
-  .count-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
-  .count-row label { font-size: 11px; color: #83769c; }
-  .count-row input { width: 50px; padding: 4px; background: #111; color: #c2c3c7; border: 1px solid #333; border-radius: 3px; font-family: monospace; }
-  #code-output {
-    width: 100%; height: 220px; margin-top: 8px; background: #111; color: #00e436;
-    border: 1px solid #333; border-radius: 4px; padding: 8px; font-family: monospace;
-    font-size: 10px; resize: vertical; white-space: pre;
+  .actions button .k { color: #777; font-weight: normal; }
+  #btn-clear { background: var(--red); color: #fff; }
+  #btn-clear:hover { background: #c52a17; }
+
+  .info {
+    font-size: 13px; line-height: 1.9; margin: 14px 0; padding: 12px;
+    background: #fff; border: 2px solid var(--ink); box-shadow: var(--shadow);
   }
-  #canvas-container { flex: 1; overflow: auto; background: #0d0d1a; padding: 20px; position: relative; }
-  canvas { display: block; image-rendering: pixelated; cursor: crosshair; }
-  .hint { font-size: 10px; color: #5f574f; margin-top: 4px; line-height: 1.5; }
+  .info span { color: var(--blue); font-weight: bold; }
+
+  .count-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .count-row label { font-size: 13px; font-weight: bold; }
+  .count-row input {
+    width: 72px; padding: 8px; font-family: inherit; font-size: 14px; font-weight: bold;
+    background: #fff; color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 0;
+  }
+
+  .zoom-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .zoom-row button { flex: 1; font-size: 18px; }
+  .zoom-row input[type=range] { flex: 2; accent-color: var(--ink); height: 44px; }
+  #zoom-label { font-size: 14px; font-weight: bold; min-width: 44px; text-align: right; }
+
+  #code-output {
+    width: 100%; height: 220px; margin-top: 8px; padding: 10px;
+    font-family: inherit; font-size: 11px; resize: vertical; white-space: pre;
+    background: var(--ink); color: #7ee787;
+    border: 2px solid var(--ink); border-radius: 0;
+    box-shadow: var(--shadow);
+  }
+
+  .hint { font-size: 12px; color: #666; margin-top: 14px; line-height: 1.7; }
+
+  /* ── Canvas area ── */
+  #canvas-container {
+    flex: 1; overflow: auto; position: relative; padding: 24px;
+    background:
+      linear-gradient(#e5e0d5 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(90deg, #e5e0d5 1px, transparent 1px) 0 0 / 24px 24px,
+      var(--paper);
+  }
+  canvas {
+    display: block; image-rendering: pixelated; cursor: crosshair;
+    border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--ink);
+  }
 </style>
 </head>
 <body>
 <div id="sidebar">
-  <h2>Loneliness — Level Editor</h2>
+  <h2><span class="jp">ほたる</span> LONELINESS<br>LEVEL EDITOR</h2>
 
-  <h3>Tool</h3>
+  <h3>TOOL <span class="jp"></span></h3>
   <div class="tools">
-    <button data-tool="plant" class="active">🌱 Plant</button>
-    <button data-tool="flower">🌸 Flower</button>
-    <button data-tool="big">👾 Big NPC</button>
-    <button data-tool="select">✋ Select</button>
+    <button data-tool="plant" class="active"><span class="jp">🌱</span>Plant</button>
+    <button data-tool="flower"><span class="jp">🌷</span>Flower</button>
+    <button data-tool="big"><span class="jp">🐞</span>Big NPC</button>
+    <button data-tool="select"><span class="jp">✋</span>Select</button>
   </div>
 
-  <h3>Color (Plant / Flower)</h3>
+  <h3>COLOR <span class="jp">色</span></h3>
   <div class="colors">
-    <button data-col="12" class="active"><span style="background:#29ADFF">&nbsp;&nbsp;</span> Blue</button>
-    <button data-col="8"><span style="background:#FF004D">&nbsp;&nbsp;</span> Red</button>
-    <button data-col="6"><span style="background:#C2C3C7">&nbsp;&nbsp;</span> White</button>
-    <button data-col="14"><span style="background:#FF77A8">&nbsp;&nbsp;</span> Pink</button>
+    <button data-col="12" class="active"><span style="background:#29ADFF"></span>Blue</button>
+    <button data-col="8"><span style="background:#FF004D"></span>Red</button>
+    <button data-col="6"><span style="background:#C2C3C7"></span>White</button>
+    <button data-col="14"><span style="background:#FF77A8"></span>Pink</button>
   </div>
 
-  <h3>NPC Spawn Count <span id="count-context" style="color:#5f574f;font-weight:normal">(next plant)</span></h3>
+  <h3>NPC SPAWN COUNT <span class="jp" id="count-context">(next plant)</span></h3>
   <div class="count-row">
     <label>Count:</label>
-    <input type="number" id="npc-count-input" min="1" max="8" value="1">
+  <input type="number" id="npc-count-input" min="1" max="8" value="1">
+  </div>
+
+  <h3>EVENT <span class="jp">イベント</span></h3>
+  <div class="actions">
+    <button id="btn-event">Event Tag: OFF</button>
+  </div>
+
+  <h3>VIEW <span class="jp">拡大</span></h3>
+  <div class="zoom-row">
+    <button id="btn-zoom-out" title="Zoom out (-)">−</button>
+    <input type="range" id="zoom-slider" min="1" max="8" step="1" value="3">
+    <button id="btn-zoom-in" title="Zoom in (+)">+</button>
+    <span id="zoom-label">3×</span>
   </div>
 
   <div class="info">
@@ -69,24 +163,25 @@
     Selected: <span id="sel-info">none</span>
   </div>
 
-  <h3>Actions</h3>
+  <h3>ACTIONS <span class="jp"></span></h3>
   <div class="actions">
-    <button id="btn-undo">↩ Undo (Ctrl+Z)</button>
-    <button id="btn-redo">↪ Redo (Ctrl+Y)</button>
-    <button id="btn-snap">🧲 Snap to Grid (G): off</button>
-    <button id="btn-export">⬇ Export Lua + .txt</button>
-    <button id="btn-copy">📋 Copy Code</button>
-    <button id="btn-load">📂 Load Setup</button>
-    <button id="btn-clear">🗑 Clear All</button>
+    <button id="btn-undo">↩ Undo <span class="k">Ctrl+Z</span></button>
+    <button id="btn-redo">↪ Redo <span class="k">Ctrl+Y</span></button>
+    <button id="btn-snap">⌗ Snap to Grid (G): off</button>
+    <button id="btn-export">↓ Export Lua + .txt</button>
+    <button id="btn-copy">⧉ Copy Code</button>
+    <button id="btn-load">▲ Load Setup</button>
+    <button id="btn-clear">✕ Clear All</button>
   </div>
   <input type="file" id="file-input" accept=".txt,.lua" hidden>
 
-  <h3>Exported Code (paste into tab 1)</h3>
+  <h3>EXPORTED CODE <span class="jp"></span></h3>
   <textarea id="code-output" readonly></textarea>
   <p class="hint">
     Click to place. Click entity to select. Drag to move. Del or ✕ to remove.<br>
     Shift-click for multi-select. Arrow keys nudge (Shift=8px).<br>
     1/2/3/4 = tools. G = toggle snap. Ctrl+Z/Y = undo/redo. Ctrl+E = export.<br>
+    Zoom: +/- keys, slider, or Ctrl+scroll wheel.<br>
     Autosaves to localStorage. Plants expand to N NPCs on export. Grass auto-derives.<br>
     Player spawns at (64,84). World Y up = negative.
   </p>
@@ -110,13 +205,14 @@ let curCount = 1;
 let snapToGrid = false;
 const SNAP = 16;
 let plants = [
-  {x:48, y:20, col:12, count:1},
-  {x:104, y:90, col:12, count:1},
-  {x:64, y:-40, col:8, count:1},
-  {x:40, y:-120, col:14, count:1},
-  {x:90, y:-200, col:6, count:1},
+  {x:48, y:20, col:12, count:1, event:false},
+  {x:104, y:90, col:12, count:1, event:false},
+  {x:64, y:-40, col:8, count:1, event:false},
+  {x:40, y:-120, col:14, count:1, event:false},
+  {x:90, y:-200, col:6, count:1, event:false},
 ];
-let flowers = [{x:30,y:-30,col:12},{x:80,y:-80,col:8},{x:50,y:-160,col:14},{x:90,y:-240,col:6}];
+let flowers = [{x:30,y:-30,col:12,event:false},{x:80,y:-80,col:8,event:false},{x:50,y:-160,col:14,event:false},{x:90,y:-240,col:6,event:false}];
+let curEvent = false;
 let big = {x:64, y:-260};
 let selected = null;   // primary single selection {type, idx}
 let multiSel = [];     // additional multi-selected entries
@@ -128,32 +224,40 @@ const STACK_MAX = 50;
 const AUTOSAVE_KEY = 'loneliness_editor_v1';
 
 // ── Canvas setup ──
-const SCALE = 3;
+let scale = 3;
 const WORLD_TOP = -350, WORLD_BOT = 130;
 const WW = 128, WH = WORLD_BOT - WORLD_TOP;
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-canvas.width = WW * SCALE;
-canvas.height = WH * SCALE;
+canvas.width = WW * scale;
+canvas.height = WH * scale;
 
-const w2c = (wx, wy) => [wx * SCALE, (wy - WORLD_TOP) * SCALE];
-const c2w = (cx, cy) => [Math.round(cx / SCALE), Math.round(cy / SCALE) + WORLD_TOP];
+function setZoom(v) {
+  scale = Math.max(1, Math.min(8, v));
+  canvas.width = WW * scale;
+  canvas.height = WH * scale;
+  document.getElementById('zoom-slider').value = scale;
+  document.getElementById('zoom-label').textContent = scale + '×';
+  draw();
+}
+
+const w2c = (wx, wy) => [wx * scale, (wy - WORLD_TOP) * scale];
+const c2w = (cx, cy) => [Math.round(cx / scale), Math.round(cy / scale) + WORLD_TOP];
 
 // ── Snap ──
 function snapV(v) { return snapToGrid ? Math.round(v / SNAP) * SNAP : v; }
 function snapW(wx, wy) { return [snapV(wx), snapV(wy)]; }
 
-// ── Snapshot / undo / redo ──
 function stateSnapshot() {
   return {
-    plants: plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count})),
-    flowers: flowers.map(f => ({x:f.x, y:f.y, col:f.col})),
+    plants: plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count, event:!!p.event})),
+    flowers: flowers.map(f => ({x:f.x, y:f.y, col:f.col, event:!!f.event})),
     big: {x: big.x, y: big.y}
   };
 }
 function restoreState(s) {
-  plants = s.plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count}));
-  flowers = s.flowers.map(f => ({x:f.x, y:f.y, col:f.col}));
+  plants = s.plants.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count, event:!!p.event}));
+  flowers = s.flowers.map(f => ({x:f.x, y:f.y, col:f.col, event:!!f.event}));
   big = {x: s.big.x, y: s.big.y};
 }
 function pushUndo() {
@@ -229,7 +333,7 @@ function expandPlants() {
   let npcs = [];
   plants.forEach(p => {
     if (p.count <= 1) {
-      npcs.push({x: p.x, y: p.y, col: p.col});
+      npcs.push({x: p.x, y: p.y, col: p.col, event: !!p.event});
     } else {
       let r = 6;
       for (let i = 0; i < p.count; i++) {
@@ -237,21 +341,20 @@ function expandPlants() {
         npcs.push({
           x: Math.round(p.x + Math.cos(a) * r),
           y: Math.round(p.y + Math.sin(a) * r),
-          col: p.col
+          col: p.col,
+          event: !!p.event
         });
       }
     }
   });
   return npcs;
 }
-
-// ── Render ──
 function draw() {
-  ctx.fillStyle = '#0d0d1a';
+  ctx.fillStyle = '#2b2b2b';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // grid every 16px
-  ctx.strokeStyle = snapToGrid ? '#29adff33' : '#1a1a2e';
+  ctx.strokeStyle = snapToGrid ? '#29adff33' : '#454545';
   ctx.lineWidth = 1;
   for (let x = 0; x <= 128; x += 16) {
     let [cx] = w2c(x, 0);
@@ -268,46 +371,47 @@ function draw() {
   ctx.strokeStyle = '#5F574F'; ctx.setLineDash([4,4]);
   ctx.strokeRect(0, vy0, canvas.width, vy1 - vy0);
   ctx.setLineDash([]);
-  ctx.fillStyle = '#5F574F'; ctx.font = '10px monospace';
+  ctx.fillStyle = '#C2C3C7'; ctx.font = `${Math.round(scale * 3.2)}px monospace`;
   ctx.fillText('y=0 (screen top at start)', 4, vy0 - 4);
 
   // player spawn marker
   let [pcx, pcy] = w2c(64, 84);
   ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 2;
-  ctx.strokeRect(pcx - SCALE*4, pcy - SCALE*4, SCALE*8, SCALE*8);
-  ctx.fillStyle = '#FFF1E8'; ctx.font = '9px monospace';
-  ctx.fillText('player (64,84)', pcx + SCALE*5, pcy);
+  ctx.strokeRect(pcx - scale*4, pcy - scale*4, scale*8, scale*8);
+  ctx.fillStyle = '#FFF1E8'; ctx.font = `${Math.round(scale * 3)}px monospace`;
+  ctx.fillText('player (64,84)', pcx + scale*5, pcy);
 
   // Plants (grass tuft + NPC cluster preview)
   plants.forEach((p, i) => {
     let [cx, cy] = w2c(p.x, p.y);
     ctx.fillStyle = '#008751';
-    ctx.fillRect(cx - SCALE*2, cy - SCALE*2, SCALE*4, SCALE*4);
+    ctx.fillRect(cx - scale*2, cy - scale*2, scale*4, scale*4);
     ctx.fillStyle = '#00E436';
-    ctx.fillRect(cx - SCALE, cy - SCALE, SCALE*2, SCALE*2);
+    ctx.fillRect(cx - scale, cy - scale, scale*2, scale*2);
     if (p.count > 1) {
       let r = 6;
       for (let j = 0; j < p.count; j++) {
         let a = (j / p.count) * Math.PI * 2 - Math.PI / 2;
         let [dx, dy] = w2c(p.x + Math.cos(a)*r, p.y + Math.sin(a)*r);
         ctx.fillStyle = PAL[p.col];
-        ctx.beginPath(); ctx.arc(dx, dy, SCALE*2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(dx, dy, scale*2, 0, Math.PI*2); ctx.fill();
       }
     } else {
       ctx.fillStyle = PAL[p.col];
-      ctx.beginPath(); ctx.arc(cx + SCALE*3, cy, SCALE*2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + scale*3, cy, scale*2, 0, Math.PI*2); ctx.fill();
     }
     // count label in plant color
-    ctx.fillStyle = PAL[p.col]; ctx.font = 'bold 9px monospace';
-    ctx.fillText('×' + p.count, cx + SCALE*4, cy - SCALE*4);
+    ctx.fillStyle = PAL[p.col]; ctx.font = `bold ${Math.round(scale * 3)}px monospace`;
+    ctx.fillText('×' + p.count, cx + scale*4, cy - scale*4);
     // selection highlight — yellow primary, cyan multi
     if (selected && selected.type === 'plant' && selected.idx === i) {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
-      ctx.strokeRect(cx - SCALE*5, cy - SCALE*5, SCALE*10, SCALE*10);
+      ctx.strokeRect(cx - scale*5, cy - scale*5, scale*10, scale*10);
     } else if (multiSel.some(s => s.type==='plant' && s.idx===i)) {
       ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
-      ctx.strokeRect(cx - SCALE*5, cy - SCALE*5, SCALE*10, SCALE*10);
+      ctx.strokeRect(cx - scale*5, cy - scale*5, scale*10, scale*10);
     }
+    if (p.event) drawEventBadge(cx, cy);
   });
 
   // Flowers
@@ -316,35 +420,36 @@ function draw() {
     ctx.fillStyle = PAL[f.col];
     for (let a = 0; a < 5; a++) {
       let ang = (a / 5) * Math.PI * 2 - Math.PI/2;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(ang)*SCALE*3, cy + Math.sin(ang)*SCALE*3, SCALE*2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + Math.cos(ang)*scale*3, cy + Math.sin(ang)*scale*3, scale*2, 0, Math.PI*2); ctx.fill();
     }
     ctx.fillStyle = '#FFEC27';
-    ctx.beginPath(); ctx.arc(cx, cy, SCALE*1.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, scale*1.5, 0, Math.PI*2); ctx.fill();
     // color dot badge top-left
     ctx.fillStyle = PAL[f.col];
-    ctx.beginPath(); ctx.arc(cx - SCALE*6, cy - SCALE*6, SCALE*1.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - scale*6, cy - scale*6, scale*1.5, 0, Math.PI*2); ctx.fill();
     if (selected && selected.type === 'flower' && selected.idx === i) {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(cx, cy, SCALE*7, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, scale*7, 0, Math.PI*2); ctx.stroke();
     } else if (multiSel.some(s => s.type==='flower' && s.idx===i)) {
       ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(cx, cy, SCALE*7, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, scale*7, 0, Math.PI*2); ctx.stroke();
     }
+    if (f.event) drawEventBadge(cx, cy);
   });
 
   // Big NPC
   {
     let [cx, cy] = w2c(big.x, big.y);
-    ctx.strokeStyle = '#1D2B53'; ctx.lineWidth = 3;
-    ctx.strokeRect(cx - SCALE*8, cy - SCALE*8, SCALE*16, SCALE*16);
-    ctx.fillStyle = '#1D2B53'; ctx.font = '9px monospace';
-    ctx.fillText('BIG', cx - SCALE*4, cy + SCALE*1);
+    ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 3;
+    ctx.strokeRect(cx - scale*8, cy - scale*8, scale*16, scale*16);
+    ctx.fillStyle = '#FFF1E8'; ctx.font = `${Math.round(scale * 3)}px monospace`;
+    ctx.fillText('BIG', cx - scale*4, cy + scale*1);
     if (selected && selected.type === 'big') {
       ctx.strokeStyle = '#FFEC27'; ctx.lineWidth = 2;
-      ctx.strokeRect(cx - SCALE*10, cy - SCALE*10, SCALE*20, SCALE*20);
+      ctx.strokeRect(cx - scale*10, cy - scale*10, scale*20, scale*20);
     } else if (multiSel.some(s => s.type==='big')) {
       ctx.strokeStyle = '#29ADFF'; ctx.lineWidth = 2;
-      ctx.strokeRect(cx - SCALE*10, cy - SCALE*10, SCALE*20, SCALE*20);
+      ctx.strokeRect(cx - scale*10, cy - scale*10, scale*20, scale*20);
     }
   }
 
@@ -352,13 +457,13 @@ function draw() {
   if (selected && !multiSel.length) {
     let e = getSelectedEntity();
     let [cx, cy] = w2c(e.x, e.y);
-    let bx = cx + SCALE*8, by = cy - SCALE*8;
+    let bx = cx + scale*8, by = cy - scale*8;
     ctx.fillStyle = '#FF004D';
-    ctx.beginPath(); ctx.arc(bx, by, SCALE*4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx, by, scale*4, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#FFF1E8'; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(bx - SCALE*2, by - SCALE*2); ctx.lineTo(bx + SCALE*2, by + SCALE*2);
-    ctx.moveTo(bx + SCALE*2, by - SCALE*2); ctx.lineTo(bx - SCALE*2, by + SCALE*2);
+    ctx.moveTo(bx - scale*2, by - scale*2); ctx.lineTo(bx + scale*2, by + scale*2);
+    ctx.moveTo(bx + scale*2, by - scale*2); ctx.lineTo(bx - scale*2, by + scale*2);
     ctx.stroke();
   }
 
@@ -394,7 +499,9 @@ function updateInfo() {
   } else {
     ctxEl.textContent = '(next plant)';
   }
+  syncEventButton();
 }
+
 
 // ── Hit test ──
 function hitTest(wx, wy) {
@@ -415,9 +522,9 @@ function deleteBtnHit(clickCX, clickCY) {
   if (!selected || multiSel.length) return false;
   let e = getSelectedEntity();
   let [cx, cy] = w2c(e.x, e.y);
-  let bx = cx + SCALE*8, by = cy - SCALE*8;
+  let bx = cx + scale*8, by = cy - scale*8;
   let dx = clickCX - bx, dy = clickCY - by;
-  return (dx*dx + dy*dy) < (SCALE*5)*(SCALE*5);
+  return (dx*dx + dy*dy) < (scale*5)*(scale*5);
 }
 
 // ── Mouse ──
@@ -453,13 +560,13 @@ canvas.addEventListener('mousedown', e => {
     dragging = true;
   } else if (tool === 'plant') {
     pushUndo();
-    plants.push({x: wx, y: wy, col: curCol, count: curCount});
+    plants.push({x: wx, y: wy, col: curCol, count: curCount, event: curEvent});
     selected = {type:'plant', idx: plants.length - 1};
     multiSel = [];
     dragging = true; dragMoved = true;
   } else if (tool === 'flower') {
     pushUndo();
-    flowers.push({x: wx, y: wy, col: curCol});
+    flowers.push({x: wx, y: wy, col: curCol, event: curEvent});
     selected = {type:'flower', idx: flowers.length - 1};
     multiSel = [];
     dragging = true; dragMoved = true;
@@ -529,6 +636,8 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key.toLowerCase() === 'g') { document.getElementById('btn-snap').click(); return; }
+  if (e.key === '+' || e.key === '=') { setZoom(scale + 1); return; }
+  if (e.key === '-') { setZoom(scale - 1); return; }
   let n = e.shiftKey ? 8 : 1;
   if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-n, 0); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(n, 0); }
@@ -584,20 +693,71 @@ document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
 document.getElementById('btn-snap').addEventListener('click', () => {
   snapToGrid = !snapToGrid;
-  document.getElementById('btn-snap').textContent = `🧲 Snap to Grid (G): ${snapToGrid ? 'on' : 'off'}`;
+  document.getElementById('btn-snap').textContent = `⌗ Snap to Grid (G): ${snapToGrid ? 'on' : 'off'}`;
   draw();
 });
+
+// ── Event toggle ──
+function syncEventButton() {
+  let e = getSelectedEntity();
+  let isEvent = curEvent;
+  if (selected && (selected.type === 'plant' || selected.type === 'flower') && e) {
+    isEvent = !!e.event;
+  }
+  let btn = document.getElementById('btn-event');
+  btn.textContent = `Event Tag: ${isEvent ? 'ON' : 'OFF'}`;
+  btn.classList.toggle('active', isEvent);
+}
+document.getElementById('btn-event').addEventListener('click', () => {
+  let e = getSelectedEntity();
+  if (selected && (selected.type === 'plant' || selected.type === 'flower') && e) {
+    pushUndo();
+    e.event = !e.event;
+  } else {
+    curEvent = !curEvent;
+  }
+  draw();
+});
+
+// ── Draw small event badge (red square) on top-right of event entities ──
+function drawEventBadge(cx, cy) {
+  let bx = cx + scale * 6, by = cy - scale * 6;
+  ctx.fillStyle = '#e1341e';
+  ctx.fillRect(bx - scale * 2, by - scale * 2, scale * 4, scale * 4);
+  ctx.strokeStyle = '#2b2b2b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx - scale * 2, by - scale * 2, scale * 4, scale * 4);
+}
+
+// ── Zoom ──
+document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(scale + 1));
+document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(scale - 1));
+document.getElementById('zoom-slider').addEventListener('input', e => setZoom(+e.target.value));
+const container = document.getElementById('canvas-container');
+container.addEventListener('wheel', e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  // keep world point under cursor fixed while zooming
+  let rect = canvas.getBoundingClientRect();
+  let fx = (e.clientX - rect.left) / rect.width;
+  let fy = (e.clientY - rect.top) / rect.height;
+  setZoom(scale + (e.deltaY < 0 ? 1 : -1));
+  rect = canvas.getBoundingClientRect();
+  container.scrollLeft += (e.clientX - rect.left) - fx * rect.width;
+  container.scrollTop += (e.clientY - rect.top) - fy * rect.height;
+}, {passive: false});
 
 // ── Export ──
 function generateLua() {
   let npcList = expandPlants();
   let lines = [];
-  let meta = JSON.stringify(plants.map(p => ({x:p.x,y:p.y,col:p.col,count:p.count})));
+  let meta = JSON.stringify(plants.map(p => ({x:p.x,y:p.y,col:p.col,count:p.count,event:!!p.event})));
   lines.push('-- editor:plants=' + meta);
   lines.push('-- npcs');
   lines.push('npcs={');
   npcList.forEach(n => {
-    lines.push(` {x=${n.x},y=${n.y},jx=0,jy=0,att=false,col=${n.col},stolen=false},`);
+    let evStr = n.event ? ',event=true' : '';
+    lines.push(` {x=${n.x},y=${n.y},jx=0,jy=0,att=false,col=${n.col},stolen=false${evStr}},`);
   });
   lines.push('}');
   lines.push('-- big npc: passive thief, steals attached NPCs, retreats when att=0');
@@ -610,7 +770,8 @@ function generateLua() {
   lines.push('-- flowers: sprite 9, world space, changes player color on hold X');
   lines.push('flowers={');
   flowers.forEach(f => {
-    lines.push(` {x=${f.x},y=${f.y},col=${f.col},used=false},`);
+    let evStr = f.event ? ',event=true' : '';
+    lines.push(` {x=${f.x},y=${f.y},col=${f.col},used=false${evStr}},`);
   });
   lines.push('}');
   return lines.join('\n');
@@ -652,7 +813,7 @@ function parseLua(text) {
   if (metaMatch) {
     try {
       let parsed = JSON.parse(metaMatch[1]);
-      plants = parsed.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count}));
+      plants = parsed.map(p => ({x:p.x, y:p.y, col:p.col, count:p.count, event:!!p.event}));
     } catch(e) { plants = []; }
   } else {
     plants = [];
@@ -660,15 +821,15 @@ function parseLua(text) {
     if (npcMatch) {
       let re = /x=(-?\d+),y=(-?\d+)[^}]*col=(\d+)/g;
       let m;
-      while ((m = re.exec(npcMatch[1]))) plants.push({x:+m[1], y:+m[2], col:+m[3], count:1});
+      while ((m = re.exec(npcMatch[1]))) plants.push({x:+m[1], y:+m[2], col:+m[3], count:1, event:false});
     }
   }
   flowers = [];
   let flMatch = text.match(/flowers=\{([\s\S]*?)\}/);
   if (flMatch) {
-    let re = /x=(-?\d+),y=(-?\d+),col=(\d+)/g;
+    let re = /x=(-?\d+),y=(-?\d+),col=(\d+)(?:[^}]*(event=true))?/g;
     let m;
-    while ((m = re.exec(flMatch[1]))) flowers.push({x:+m[1], y:+m[2], col:+m[3]});
+    while ((m = re.exec(flMatch[1]))) flowers.push({x:+m[1], y:+m[2], col:+m[3], event:!!m[4]});
   }
   big = {x:64, y:-260};
   let bigMatch = text.match(/big=\{x=(-?\d+),y=(-?\d+)/);
