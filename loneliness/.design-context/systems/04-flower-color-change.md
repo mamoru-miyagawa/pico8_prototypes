@@ -183,3 +183,17 @@ Transitions:
 - Flower event: complete = color change (any color, including no-op-with-guard? design TBD).
 - NPC event: complete = NPC attached OR fled.
 - Not in code. Design decision recorded; implementation TBD (see OQ6).
+
+## Behavior Flowchart
+
+```mermaid
+flowchart TD
+    Spawn([Flower placed]) --> Unused[Unused]
+    Unused -->|player nearby + hold X| Charging[Charging]
+    Charging -->|out of range or X released| Unused
+    Charging -->|charge reaches 90 about 3 seconds| Check{Same color<br/>as current?}
+    Check -->|Yes, mis-input| Unused
+    Check -->|No| Used[Used]
+    Used --> Change[Color change, mismatched NPCs flee, burst ring, pollen push]
+    Change --> Done([Inert forever])
+```

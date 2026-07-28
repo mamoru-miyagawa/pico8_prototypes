@@ -539,3 +539,38 @@ Reference section — not features, but hard-won knowledge for future work.
 - **Tried first (failed):** `if py<ceiling then py=ceiling end` — clamped the player to the event's world y. Player got stuck on an invisible wall at `sy=60` overlapping the event, camera stalled, but the player couldn't move. Felt like a collision, not a narrative beat. **Final:** cap `cam_y` instead of `py`. Player walks past; world doesn't follow.
 - **Flagged with `event=true` in current level:** plant at world (64, -111) — single test entity for in-cart feel check. Remove or replicate as the level is built out.
 - **Tunables added:** none — top-half threshold `64` is half the screen height (128). No new global; `cam_dead=60` was already the scroll floor.
+
+## Event Camera Lock — Cap Fix + Smooth Catch-up
+- **Date:** 2026-07-28
+- **Status:** complete
+- **What it is:** Refinement of the narrative event camera lock — the cap now actually holds, and the post-resolve scroll is smooth.
+- **What it does:** The original cap was an upper bound on `cam_y` (`>`) and ran before the scroll, so the scroll overwrote it and the camera sailed past events. Fixed: cap is now a **lower** bound (`<`) applied after the scroll. Separately, when the player walked past an event and the cap released, the camera used to teleport. Added a per-frame scroll clamp (`cam_scroll_max`, default 2) so the camera catches up smoothly over many frames.
+- **How implemented:**
+  - `update_camera`: cap `>` → `<`, moved to after the scroll; stale "floor the camera…" comment fixed.
+  - Scroll step: `local step = cam_dead - sy; if step > cam_scroll_max then step = cam_scroll_max end; cam_y -= step`. (PICO-8 lua: one `local` per statement; nested ifs expanded to multi-line — mid-stmt `local` and nested inline ifs both crash the parser.)
+- **Tunables added:**
+  - `cam_scroll_max=2` — max px the camera scrolls up per frame
+
+## Chunked/Gated Spawning
+- **Date:** 2026-07-28
+- **Status:** complete
+- **What it is:** Level entities spawn lazily in chunks, gated by event resolution — the endless ascent stays memory-bounded.
+- **What it does:** A `chunks` array holds "spawn deltas" (npcs/flowers/grass + optional `c.big`). The first block is the existing flat entity data (no migration). On an event resolving (flower absorb / NPC call-wave hit / Big fully offscreen), the next chunk spawns: its npcs/flowers/grass are appended to the live tables, and `c.big` (if any) replaces the global `big` after cleaning big's stolen retinue. Big joins the camera lock scan and the initial big carries `event=true` (Big is now a valid gate). The old big despawns by being replaced with a `{done=true}` sentinel — every existing `not big.done` / `big.event` / `big.cast` check treats the sentinel as gone, so zero nil-guards were needed; the old big table is unreferenced and GC'd. With `chunks={}` the system is dormant (every hook no-ops until the designer authors blocks — a level-editor follow-up).
+- **How implemented:**
+  - Data: `chunks={}`, `next_chunk=1`, initial big gains `event=true`.
+  - `spawn_next_chunk()` near the big data: fetches `chunks[next_chunk]`, appends npcs/flowers/grass; if `c.big` then dels `n.stolen` npcs and assigns `big = c.big`. No-op if `c == nil`.
+  - 3 resolve hooks: flower absorb (`if f.event then spawn_next_chunk() end` — guarded, since `f.used` fires for non-event flowers), NPC call-wave hit (folded into existing `if n.event`, already gated), Big offscreen (gated `if big.event`).
+  - Camera lock scan gains a Big block: `if big.event and not big.retreat and not big.done then` — same `fsy > -16 and fsy < 64` gate.
+  - Big despawn (offscreen branch): `big.done = true; local was_event = big.event; for n in all(npcs) do if n.stolen then del(npcs,n) end end; big = {done=true}; if was_event then spawn_next_chunk() end`. Stolen-retinue cleanup required because orbit math (`big.x + cos(a)*16`) would dereference a field the sentinel doesn't have.
+  - Free-walk preserved: no `py` gate. Player can overshoot; camera lock holds; player returns to engage. Next chunk spawns only on resolve.
+- **Tunables added:** none.
+
+## SFX Additions (Call Wave, Flower Charge, Big Cast, Big Retreat)
+- **Date:** 2026-07-28
+- **Status:** complete
+- **What it is:** Four SFX slots wired to game verbs.
+- **What it does:** `sfx(53)` fires once on call-wave emit. `sfx(54)` re-triggers each frame while a flower is being charged (stops on release/leaving range). `sfx(55)` fires on the frame Big starts its cast wave. `sfx(56)` re-triggers each frame while Big is retreating (stops at the offscreen check / despawn).
+- **How implemented:**
+  - sfx(53): appended to the call-wave init line. sfx(55): appended to the cast-ring spawn line. sfx(56): new line inside the retreat else. sfx(54): `if flower_charging then sfx(54) end` after the flower loop, before the movement gate.
+  - PICO-8 can't halt a playing sfx mid-note, so the "re-trigger each frame" idiom gives loop-while-active / stop-on-release for 54 and 56 — they should be short sounds in the editor. Slots 53–56 follow the whole-tone scale (50–52 do).
+- **Tunables added:** none.

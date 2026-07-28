@@ -178,3 +178,24 @@ Transitions:
 | Contradicts anything? | **Flag:** missing fixed-point overflow guard in call wave distance check. Pattern matches already-fixed Big/flower bugs. Add guard. **Flag:** potential `norbit=0` div-by-zero in slot angle math, currently masked by branching. Document. |
 
 **Verdict:** PASS with two flags. Flag 1 (overflow guard) = real bug risk; fix candidate. Flag 2 (div-by-zero) = latent, currently unreachable; document only.
+
+## Behavior Flowchart
+
+```mermaid
+flowchart TD
+    Spawn([Spawn]) --> Free[Free]
+    Wave[Call wave] --> Reach{Reaches NPC?}
+    Reach -->|No| Free
+    Reach -->|Yes| Match{Color matches<br/>player?}
+    Match -->|Yes| Att[Attached]
+    Match -->|No| Flee[Fleeing]
+    Flee --> Off{Off-screen?}
+    Off -->|Yes| Del([Deleted])
+    Off -->|No| Flee
+    Att --> Far{distance ><br/>att_lose_range?}
+    Far -->|Yes| Drift[Drift]
+    Far -->|No| Att
+    Drift --> Reach
+    Att -->|Big steals| Sto[Stolen]
+    Sto -->|Big offscreen| Del
+```

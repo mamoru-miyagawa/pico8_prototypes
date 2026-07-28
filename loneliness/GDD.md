@@ -4,7 +4,7 @@
 > **Platform:** PICO-8 (native + web export)
 > **Target Audience:** players of short emotional indie works (Cart Life, Glitchhikers, Bernband); PICO-8 community; jam audience
 > **Status:** Draft
-> **Last Updated:** 2026-07-24
+> **Last Updated:** 2026-07-28
 
 This GDD is a wiki — summaries with links to deeper docs in `.design-context/`. Full system designs, tuning tables, edge cases, and code-level detail live there.
 
@@ -116,6 +116,7 @@ Player has cycled through colors, learned Big's behavior, learned color-change c
 | 7 | Grass & Flower Visual | Content | P1/P2/P3 | atmosphere | ⚠ — hardcoded grass removal TBD |
 | 8 | Splash + Intro + Fade-In | Content | P1/P2/P3 | pre-play | ✅ |
 | 9 | Narrative Event (Camera Stall) | Beat | P1/P3 | Gate | ✅ |
+| 10 | Chunked/Gated Spawning | Core | P1/P3 | Gate | ✅ |
 
 Status: ✅ locked / ⚠ flag open / ❌ blocked.
 
@@ -173,17 +174,33 @@ First impression + narrative framing + transition choreography. Splash brands th
 
 Full design: [`.design-context/systems/08-splash-intro-fadein.md`](.design-context/systems/08-splash-intro-fadein.md)
 
-### System 9 — Narrative Event (Camera Stall)
+## System 9 — Narrative Event (Camera Stall)
 
-Some flowers and NPCs carry an `event` flag. When the player walks the entity into the top half of the screen, the world refuses to follow. The player keeps moving — past the event, into the empty air above it — but the camera stalls until the beat resolves. P1 (Always Move Forward) is preserved on the player's side; the stall lives in the world, not the body. P3 (Emotion Currency) is served by forcing the beat to land: the player can't ratchet past a story moment without resolving it.
+Some flowers, NPCs, and Big NPCs carry an `event` flag. When the player walks the entity into the top half of the screen, the world refuses to follow. The player keeps moving — past the event, into the empty air above it — but the camera stalls until the beat resolves. P1 (Always Move Forward) is preserved on the player's side; the stall lives in the world, not the body. P3 (Emotion Currency) is served by forcing the beat to land: the player can't ratchet past a story moment without resolving it.
 
 Resolution predicates:
 - **Flower** — resolves when the player absorbs the flower (`f.used = true` after a successful color-change charge).
 - **NPC** — resolves when the call wave actually hits the NPC (`n.event_done = true`, set the moment `call.hit[n] = true`). Proximity-flee does *not* resolve the lock — the player must use the wave.
+- **Big NPC** — resolves when Big's retreat takes it fully offscreen (`big.y - cam_y > 144` or off the sides). On resolve, Big is despawned (replaced with a `{done=true}` sentinel; old Big GC'd) and the next chunk spawns (System 10).
 
-Camera mechanic: per-frame scan inside `update_camera` finds the highest-world-y unresolved event in the top half (`-16 < sy < 64`) and caps `cam_y` at `ceiling − cam_dead`. That places the event at `sy = cam_dead` — the natural scroll floor — and pins the world there. The player walks past; the camera simply doesn't follow. Once the event resolves the cap vanishes and the normal `sy < cam_dead` scroll takes over.
+Camera mechanic: per-frame scan inside `update_camera` finds the highest-world-y unresolved event in the top half (`-16 < sy < 64`) and caps `cam_y` at `ceiling − cam_dead` as a **lower** bound (applied after the scroll). That places the event at `sy = cam_dead` — the natural scroll floor — and pins the world there. The player walks past; the camera simply doesn't follow. Once the event resolves the cap vanishes. To avoid a teleport when the player has overshot, the per-frame scroll step is clamped by `cam_scroll_max` (default 2 px), so the camera catches up smoothly over many frames. The scan covers flowers, npcs, and Big (Big only when `not big.retreat and not big.done`).
 
-Authoring: per-entity boolean in the level data. Big NPC is excluded — events are for regular NPCs and flowers only. The level editor (`level_editor.html`) has an "Event Tag: ON/OFF" toggle and a small red badge on flagged entities.
+Authoring: per-entity boolean in the level data. Big participates as a chunk's gate event (see System 10 — Chunked/Gated Spawning): a chunk's `c.big` carries `event=true`, and the initial Big in the level data is marked `event=true`. The level editor (`level_editor.html`) has an "Event Tag: ON/OFF" toggle and a small red badge on flagged plants and flowers; Big-as-event and chunk authoring are runtime/data concerns for now (editor support is a follow-up — System 10 editor UX).
+Full design: pending system file (this entry is the source of truth until written).
+
+## System 10 — Chunked/Gated Spawning
+
+Level entities spawn lazily in chunks, gated by event resolution. The endless ascent stays memory-bounded: only the current chunk's entities are live, and a chunk's entities spawn only after the previous chunk's gate event resolves.
+
+Shape: a `chunks` array holds "spawn deltas". Each chunk has optional lists of npcs, flowers, and grass to add, plus an optional Big (`c.big`). The first block is the existing flat entity data in tab 1 (no migration — it is chunk 0 implicitly). On a gate event resolving, `spawn_next_chunk()` appends the next chunk's entities to the live tables and (if `c.big`) replaces the global Big after cleaning Big's stolen retinue. With `chunks={}` the system is dormant — every resolve hook fires and no-ops until the designer authors further blocks.
+
+Gating — every chunk has exactly one gate event (the chunk's beat): a flower, an NPC, or the chunk's Big. Hooks: flower absorb (`f.used=true`, guarded `if f.event`), NPC call-wave hit (`n.event_done=true`, already gated by `n.event`), Big fully offscreen (gated `if big.event`). Strict one-gate-per-chunk + lazy spawn means at most one unresolved event is live, so a hook firing always corresponds to the current gate.
+
+Big as event: Big joins the camera lock scan (same `fsy` gate, `not big.retreat and not big.done`), and the initial Big carries `event=true`. Big despawns on offscreen resolve by replacing `big` with a `{done=true}` sentinel — the existing `not big.done` / `big.event` / `big.cast` checks everywhere naturally treat the sentinel as gone (zero new crash surface; old Big table unreferenced and GC'd). The stolen-retinue cleanup is required because the orbit math (`big.x+cos(a)*16`) would dereference a field the sentinel doesn't have. Big's `fdy` zeroed upward (existing flee rule) so the gate retreats off the bottom/sides, not straight up past the player.
+
+Free-walk + gated spawn — tension: the player can walk past an unresolved event (no `py` gate), the camera lock holds, and the player can return to engage. The lock + chunk gate together enforce "engage the beat to progress" without trapping the body, preserving P1. If the player overshoots, they recover by walking back down (the lock is a lower bound on `cam_y`, so downward camera scroll is free).
+
+Editor follow-up: `level_editor.html` does not yet author chunks — the runtime currently has `chunks={}` (system dormant). The chunk authoring UX (how a designer lays out "block 1: A,B,C + event; block 2: …") is tracked as a should-have (Build Pipeline).
 
 Full design: pending system file (this entry is the source of truth until written).
 
@@ -243,7 +260,7 @@ Tuning intent and relationships, not absolute numbers (numbers are placeholders 
 
 - PICO-8 editor → reload cart → run (Ctrl+R reruns loaded cart, does NOT reload from disk — must reload after external edits)
 - Web export via PICO-8 export command
-- **Should-have:** Code cleanup (overflow guards, mis-input guard, hardcoded grass removal, Big idle drift).
+**Should-have:** Code cleanup (overflow guards, mis-input guard, hardcoded grass removal, Big idle drift); editor chunk authoring (System 10).
 - **Nice-to-have:** Level-editor validation, Pairwise Matrix, formal Balance & Tuning pass. (Narrative Event lock shipped 2026-07-28.)
 
 ## 10. Production & Scope

@@ -205,3 +205,16 @@ Transitions:
 - **Flag 1** (expose `post_steal` + `cast_t` tunables) = small cleanup, deferred.
 - **Flag 2 RESOLVED 2026-07-24:** Big will drift toward nearest side wall when onscreen but unengaged (no cast triggered). Goal: faster exit, prevents player skirting `steal_range` to keep Big idle forever. Serves P1 (forward-only escape) + P3 (dread without fatigue). New tunable `big_idle_drift` proposed. **Not yet implemented — design decision recorded, code change TBD.**
 - **Flag 3 DEFERRED 2026-07-24:** Cast may continue if Big goes offscreen mid-cast; Big spawn timing during fade-in. User: "Big should only be active when it appears on screen so it doesn't matter too much whether it spawns at start or only when the player is close. Might become a bug eventually but should wait and see." Revisit if observed.
+
+## Behavior Flowchart
+
+```mermaid
+flowchart TD
+    Spawn([Big spawns]) --> Idle[Idle onscreen]
+    Idle -->|player in steal_range| Cast[Casting, 36 frames]
+    Cast -->|cast_t reaches 0| Steal[Stealing]
+    Steal -->|no attached NPCs left| Pause[PostSteal, 15 frames]
+    Pause -->|pause elapses| Retreat[Retreating sideways]
+    Retreat -->|off-screen| Despawn[Old big entity deleted, sentinel flag remains, chunk spawns]
+    Despawn --> Done([Done])
+```

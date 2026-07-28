@@ -139,6 +139,7 @@ function _update()
        f.used=true
        set_player_color(f.col)
        add(rings,{r=8,a=36,vg=6,x=px+4,y=(py-cam_y)+4,col=f.col,burst=true})
+       if f.event then spawn_next_chunk() end
       end
      else
       f.charge=0
@@ -148,6 +149,7 @@ function _update()
     end
    end
   end
+if flower_charging then sfx(54) end
  if not flower_charging then
   if btn(0) then px-=spd end
   if btn(1) then px+=spd end
@@ -216,7 +218,7 @@ function _update()
  -- call wave: btnp(O) emits radial wave; matching npcs attach, others flee
  if call.cd>0 then call.cd-=1 end
  if btnp(4) and not call.active and call.cd<=0 then
-  call.active=true call.r=0 call.hit={}
+ call.active=true call.r=0 call.hit={} sfx(53)
  end
  if call.active then
   call.r+=call_speed
@@ -226,7 +228,7 @@ function _update()
     local d=sqrt(dx*dx+dy*dy)
     if d<=call.r then
      call.hit[n]=true
-     if n.event then n.event_done=true end
+     if n.event then n.event_done=true spawn_next_chunk() end
      if n.col==pcol then
       if not n.att then
        n.att=true n.att_fc=fc big.sc=0
@@ -314,7 +316,7 @@ function _update()
        if not big.cast then
         big.cast=true
         big.cast_t=36
-        add(rings,{r=8,a=36,vg=4.5,x=big.x+8,y=(big.y-cam_y)+8})
+        add(rings,{r=8,a=36,vg=4.5,x=big.x+8,y=(big.y-cam_y)+8}) sfx(55)
        end
       end
       if big.cast then
@@ -361,7 +363,14 @@ function _update()
      else
       big.x+=big.fdx*big_retreat_sp
       big.y+=big.fdy*big_retreat_sp
-     if big.y-cam_y>144 or big.x<-16 or big.x>144 then big.done=true end
+      sfx(56)
+     if big.y-cam_y>144 or big.x<-16 or big.x>144 then
+      big.done=true
+      local was_event=big.event
+      for n in all(npcs) do if n.stolen then del(npcs,n) end end
+      big={done=true}
+      if was_event then spawn_next_chunk() end
+     end
     end
    end
   -- big npc twitch
@@ -404,6 +413,9 @@ function _draw()
    if p>=1 then col=0 end
   end
   print(txt,56-#txt*2,62,col)
+if shown>=5 then print("ho",68-2*shown,78,col) end
+if shown>=6 then print("ta",76-2*shown,78,col) end
+if shown>=7 then print("ru",84-2*shown,78,col) end
   return
  end
  -- grass shadows (under glow)
@@ -581,14 +593,13 @@ cam_y=0
 corridor_l=0
 corridor_r=120
 cam_dead=60
+cam_scroll_max=2
 
 function update_camera()
- -- event camera lock: pick the highest-world-y (lowest on screen) unresolved
- -- event in the top half, then cap how far the camera may scroll up so the
- -- event can't leave the screen. Player keeps walking past freely; only the
- -- camera stalls. Per-frame scan, no persistent engaged flag. Once the entity
- -- resolves (flower absorbed, or NPC hit by the call wave — n.event_done),
- -- the cap vanishes and the normal cam_dead scroll takes over.
+ -- event camera lock: pick the highest-world-y unresolved event in the
+ -- top half, then floor the camera so the event stays on screen while
+ -- unresolved. Player walks past freely; cap releases when the event
+ -- resolves (flower absorbed, or NPC hit by the call wave ヌ█⬆️ n.event_done).
  local ceiling=-32768
  for f in all(flowers) do
   if f.event and not f.used then
@@ -602,16 +613,25 @@ function update_camera()
    if nsy>-16 and nsy<64 and n.y>ceiling then ceiling=n.y end
   end
  end
- -- floor the camera so the ceiling event sits at sy=cam_dead (the natural
- -- scroll floor). Anything higher means the player walks past the event but
- -- the world refuses to follow.
- if ceiling>-32768 then
-  local cam_floor=ceiling-cam_dead
-  if cam_y>cam_floor then cam_y=cam_floor end
- end
- local sy=py-cam_y
- if sy<cam_dead then cam_y-=(cam_dead-sy) end
+if big.event and not big.retreat and not big.done then
+ local bsy=big.y-cam_y
+ if bsy>-16 and bsy<64 and big.y>ceiling then ceiling=big.y end
+end
+ -- normal camera scroll (must run before the cap so the cap can override it)
+local sy=py-cam_y
+local step=0
+if sy<cam_dead then
+ step=cam_dead-sy
+ if step>cam_scroll_max then step=cam_scroll_max end
+ cam_y-=step
+end
  if py>cam_y+120 then py=cam_y+120 end
+-- gate: floor the camera so the ceiling event sits at sy=cam_dead. Player
+-- walks past freely; cap releases as soon as the event resolves.
+if ceiling>-32768 then
+ local cam_floor=ceiling-cam_dead
+ if cam_y<cam_floor then cam_y=cam_floor end
+end
  px=mid(corridor_l,px,corridor_r)
 end
 
@@ -630,7 +650,21 @@ npcs={
  {x=77,y=46,jx=0,jy=0,att=false,col=12,stolen=false},
 }
 -- big npc: passive thief, steals attached npcs, retreats when att=0
-big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
+big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0,event=true}
+chunks={}
+next_chunk=1
+function spawn_next_chunk()
+ local c=chunks[next_chunk]
+ if c==nil then return end
+ for n in all(c.npcs) do add(npcs,n) end
+ for f in all(c.flowers) do add(flowers,f) end
+ for g in all(c.grass) do add(grass,g) end
+ if c.big then
+  for n in all(npcs) do if n.stolen then del(npcs,n) end end
+  big=c.big
+ end
+ next_chunk+=1
+end
 -- grass tufts next to each spawner (sprite 7, world space, col 2 base glow)
 grass={}
 grass[1]={x=64+12,y=-111}
@@ -951,6 +985,10 @@ c11c00000c1320f1321313218132181120f13213132181320a1320e1321113216132161120e13211
 00100000267303273026740327403b7503b7303b71006700327003b7003b7003b7003b700327003b7003b7003b700000000000000000000000000000000067000000000000000000000000000000000000000000
 000800002575034750347303471035700357000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 000400001575016550197501074011540137301f7001f7001f7000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
+000400000f5501055014550145501c5501f550275502d550335500050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500005000050000500
+000c00000a5200c5200f520185201b5201e52016520185301a5302453027530295402354024540275403154033540365503a5503f550005000050000500005000050000500005000050000500005000050000500
+000800000615007150081500a1500c1500e1501115014150191501b1501e150201500010000100001000010000100001000010000100001000010000100001000010000100001000010000100001000010000100
+00100004097300a7400a7300974000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700007000070000700
 __music__
 00 00010243
 00 04050647
