@@ -226,6 +226,7 @@ function _update()
     local d=sqrt(dx*dx+dy*dy)
     if d<=call.r then
      call.hit[n]=true
+     if n.event then n.event_done=true end
      if n.col==pcol then
       if not n.att then
        n.att=true n.att_fc=fc big.sc=0
@@ -582,33 +583,63 @@ corridor_r=120
 cam_dead=60
 
 function update_camera()
+ -- event camera lock: pick the highest-world-y (lowest on screen) unresolved
+ -- event in the top half, then cap how far the camera may scroll up so the
+ -- event can't leave the screen. Player keeps walking past freely; only the
+ -- camera stalls. Per-frame scan, no persistent engaged flag. Once the entity
+ -- resolves (flower absorbed, or NPC hit by the call wave — n.event_done),
+ -- the cap vanishes and the normal cam_dead scroll takes over.
+ local ceiling=-32768
+ for f in all(flowers) do
+  if f.event and not f.used then
+   local fsy=f.y-cam_y
+   if fsy>-16 and fsy<64 and f.y>ceiling then ceiling=f.y end
+  end
+ end
+ for n in all(npcs) do
+  if n.event and not n.stolen and not n.event_done then
+   local nsy=n.y-cam_y
+   if nsy>-16 and nsy<64 and n.y>ceiling then ceiling=n.y end
+  end
+ end
+ -- floor the camera so the ceiling event sits at sy=cam_dead (the natural
+ -- scroll floor). Anything higher means the player walks past the event but
+ -- the world refuses to follow.
+ if ceiling>-32768 then
+  local cam_floor=ceiling-cam_dead
+  if cam_y>cam_floor then cam_y=cam_floor end
+ end
  local sy=py-cam_y
  if sy<cam_dead then cam_y-=(cam_dead-sy) end
  if py>cam_y+120 then py=cam_y+120 end
  px=mid(corridor_l,px,corridor_r)
 end
 
--- editor:plants=[{"x":24,"y":44,"col":12,"count":2},{"x":101,"y":16,"col":12,"count":1},{"x":98,"y":-72,"col":12,"count":1},{"x":21,"y":-90,"col":12,"count":2}]
+-- editor:plants=[{"x":64,"y":-111,"col":12,"count":1,"event":true},{"x":30,"y":-48,"col":12,"count":3,"event":false},{"x":101,"y":-11,"col":12,"count":1,"event":false},{"x":42,"y":20,"col":12,"count":3,"event":false},{"x":77,"y":40,"col":12,"count":2,"event":false}]
 -- npcs
 npcs={
- {x=24,y=38,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=24,y=50,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=101,y=16,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=98,y=-72,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=21,y=-96,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=21,y=-84,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=64,y=-111,jx=0,jy=0,att=false,col=12,stolen=false,event=true},
+ {x=30,y=-54,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=35,y=-45,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=25,y=-45,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=101,y=-11,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=42,y=14,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=47,y=23,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=37,y=23,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=77,y=34,jx=0,jy=0,att=false,col=12,stolen=false},
+ {x=77,y=46,jx=0,jy=0,att=false,col=12,stolen=false},
 }
 -- big npc: passive thief, steals attached npcs, retreats when att=0
-big={x=63,y=-191,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
--- grass tufts: one per plant (not per npc), matches level_editor export
+big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0}
+-- grass tufts next to each spawner (sprite 7, world space, col 2 base glow)
 grass={}
-grass[1]={x=24+12,y=44}
-grass[2]={x=101+12,y=16}
-grass[3]={x=98+12,y=-72}
-grass[4]={x=21+12,y=-90}
+grass[1]={x=64+12,y=-111}
+grass[2]={x=30+12,y=-48}
+grass[3]={x=101+12,y=-11}
+grass[4]={x=42+12,y=20}
+grass[5]={x=77+12,y=40}
 -- flowers: sprite 9, world space, changes player color on hold x
 flowers={
- {x=62,y=-27,col=12,used=false},
 }
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000b00000000000077000000000000000000000000000000000000000000000000000
