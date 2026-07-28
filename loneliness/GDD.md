@@ -115,6 +115,7 @@ Player has cycled through colors, learned Big's behavior, learned color-change c
 | 6 | Dynamic Soundtrack | Secondary | P2/P3 | display | ⚠ — musical ceiling vs unbounded glow |
 | 7 | Grass & Flower Visual | Content | P1/P2/P3 | atmosphere | ⚠ — hardcoded grass removal TBD |
 | 8 | Splash + Intro + Fade-In | Content | P1/P2/P3 | pre-play | ✅ |
+| 9 | Narrative Event (Camera Stall) | Beat | P1/P3 | Gate | ✅ |
 
 Status: ✅ locked / ⚠ flag open / ❌ blocked.
 
@@ -172,6 +173,20 @@ First impression + narrative framing + transition choreography. Splash brands th
 
 Full design: [`.design-context/systems/08-splash-intro-fadein.md`](.design-context/systems/08-splash-intro-fadein.md)
 
+### System 9 — Narrative Event (Camera Stall)
+
+Some flowers and NPCs carry an `event` flag. When the player walks the entity into the top half of the screen, the world refuses to follow. The player keeps moving — past the event, into the empty air above it — but the camera stalls until the beat resolves. P1 (Always Move Forward) is preserved on the player's side; the stall lives in the world, not the body. P3 (Emotion Currency) is served by forcing the beat to land: the player can't ratchet past a story moment without resolving it.
+
+Resolution predicates:
+- **Flower** — resolves when the player absorbs the flower (`f.used = true` after a successful color-change charge).
+- **NPC** — resolves when the call wave actually hits the NPC (`n.event_done = true`, set the moment `call.hit[n] = true`). Proximity-flee does *not* resolve the lock — the player must use the wave.
+
+Camera mechanic: per-frame scan inside `update_camera` finds the highest-world-y unresolved event in the top half (`-16 < sy < 64`) and caps `cam_y` at `ceiling − cam_dead`. That places the event at `sy = cam_dead` — the natural scroll floor — and pins the world there. The player walks past; the camera simply doesn't follow. Once the event resolves the cap vanishes and the normal `sy < cam_dead` scroll takes over.
+
+Authoring: per-entity boolean in the level data. Big NPC is excluded — events are for regular NPCs and flowers only. The level editor (`level_editor.html`) has an "Event Tag: ON/OFF" toggle and a small red badge on flagged entities.
+
+Full design: pending system file (this entry is the source of truth until written).
+
 ---
 
 ## 7. Pairwise Interaction Matrix
@@ -228,9 +243,8 @@ Tuning intent and relationships, not absolute numbers (numbers are placeholders 
 
 - PICO-8 editor → reload cart → run (Ctrl+R reruns loaded cart, does NOT reload from disk — must reload after external edits)
 - Web export via PICO-8 export command
-- Level layout: `level_editor.html` external tool → exports Lua for tab 1
-
----
+- **Should-have:** Code cleanup (overflow guards, mis-input guard, hardcoded grass removal, Big idle drift).
+- **Nice-to-have:** Level-editor validation, Pairwise Matrix, formal Balance & Tuning pass. (Narrative Event lock shipped 2026-07-28.)
 
 ## 10. Production & Scope
 
@@ -239,13 +253,11 @@ Tuning intent and relationships, not absolute numbers (numbers are placeholders 
 **Estimated Timeline:**
 
 - Cart feature-complete (current scope). GDD post-hoc.
-- Remaining: ending beat design, code-change cleanup, level-editor validation, Narrative Event lock mechanic.
+- Remaining: ending beat design, code-change cleanup, level-editor validation.
 
 **Feature Priority:**
 
 - **Must-have:** Ending beat (narrative game, ending required).
-- **Should-have:** Code cleanup (overflow guards, mis-input guard, hardcoded grass removal, Big idle drift).
-- **Nice-to-have:** Narrative Event lock mechanic, level-editor validation, Pairwise Matrix, formal Balance & Tuning pass.
 
 **Risk Register:**
 
@@ -262,7 +274,7 @@ Tuning intent and relationships, not absolute numbers (numbers are placeholders 
 
 ## 11. Appendices
 
-**Open Questions:** [`.design-context/open-questions.md`](.design-context/open-questions.md) — 8 open, 1 resolved.
+**Open Questions:** [`.design-context/open-questions.md`](.design-context/open-questions.md) — 6 open, 2 resolved.
 
 **Code Change Queue:** [`.design-context/code-change-queue.md`](.design-context/code-change-queue.md) — design decisions made, awaiting implementation.
 

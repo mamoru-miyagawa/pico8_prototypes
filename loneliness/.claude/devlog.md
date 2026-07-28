@@ -519,3 +519,23 @@ Reference section — not features, but hard-won knowledge for future work.
 - **What it is:** Grass tufts now spawn once per level-editor plant, not once per expanded NPC.
 - **What it does:** Fixes "plant count:2 → two grass tufts with one NPC each." Multi-NPC plants now show a single grass tuft at the plant center with their NPC cluster.
 - **How implemented:** Replaced `for i,n in ipairs(npcs) do grass[i]={x=n.x+12,y=n.y} end` with explicit per-plant entries (loneliness.p8:603-608). Editor already fixed in commit `38d5e70` (`grass[i]={x=p.x+12,y=p.y}` indexed by plant, not NPC).
+
+## Narrative Event (camera stall)
+- **Date:** 2026-07-28
+- **Status:** complete (resolves OQ7)
+- **What it is:** Plants and flowers can be flagged as Narrative Events. When the player walks into the event's screen position, the camera refuses to scroll past it until the entity resolves. The player is *not* blocked — they walk past freely; only the world stops following.
+- **What it does:**
+  - Flagged entity in the top half of the screen → `cam_y` capped so the entity sits at `sy = cam_dead` (the natural scroll floor).
+  - Player presses up: `py` keeps decreasing, `sy` keeps decreasing, the event drifts down the screen behind the player. Camera stays pinned.
+  - Resolution releases the cap; normal scroll resumes.
+  - Flower resolves on absorption (`f.used = true`).
+  - NPC resolves when the call wave actually hits (`n.event_done = true` at `call.hit[n]=true`). Proximity-flee does NOT release the lock — the player must use the wave.
+  - Big NPC is excluded (this is for regular NPCs and flowers only).
+- **How implemented:**
+  - Data: `event=true` on `npcs[]` and `flowers[]` in tab 1. Optional — absent reads as falsy in PICO-8.
+  - `update_camera()` scans flowers (`f.event and not f.used`) and npcs (`n.event and not n.stolen and not n.event_done`) in the top half (`-16 < sy < 64`), picks the highest-world-y as the ceiling, then caps `cam_y` at `ceiling - cam_dead`. Per-frame scan, no persistent engaged flag.
+  - Wave hit: `if n.event then n.event_done=true end` set right after `call.hit[n]=true`.
+  - Level editor (`level_editor.html`): new EVENT sidebar section with an "Event Tag: ON/OFF" toggle that mirrors the color/count pattern (updates the selected entity with undo, or sets `curEvent` for the next placement). Tiny red 4×4 badge with black outline drawn on top-right of every flagged plant/flower. `stateSnapshot`, `restoreState`, `expandPlants`, `generateLua` (only emits `,event=true` when set), and `parseLua` (regex `event=true`) all carry the field. The `-- editor:plants=` JSON metadata includes `event` so saved levels round-trip.
+- **Tried first (failed):** `if py<ceiling then py=ceiling end` — clamped the player to the event's world y. Player got stuck on an invisible wall at `sy=60` overlapping the event, camera stalled, but the player couldn't move. Felt like a collision, not a narrative beat. **Final:** cap `cam_y` instead of `py`. Player walks past; world doesn't follow.
+- **Flagged with `event=true` in current level:** plant at world (64, -111) — single test entity for in-cart feel check. Remove or replicate as the level is built out.
+- **Tunables added:** none — top-half threshold `64` is half the screen height (128). No new global; `cam_dead=60` was already the scroll floor.

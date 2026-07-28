@@ -8,7 +8,7 @@
 | OQ4 | What is the ending beat trigger and form? Narrative conclusion must exist (OQ2 resolved). Needs: trigger condition, text/visual/music treatment, credits transition. Blocks final GDD section. | 2026-07-24 | open — raised from OQ2 resolution |
 | OQ5 | Big NPC: implement idle side-wall drift (Flag 2 resolved)? Tunable `big_idle_drift` proposed. Also: expose `post_steal` + `cast_t` as tunables (Flag 1). Also: offscreen cast continuation bug (Flag 3) — defer until observed? | 2026-07-24 | open — design decision locked, code change TBD |
 | OQ6 | Flower color-change mis-input guard — when `f.col == pcol` at charge completion, skip `f.used=true` + burst, reset `f.charge=0`. Implement in code. | 2026-07-24 | open — code change TBD |
-| OQ7 | Narrative Event camera lock (new mechanic raised 2026-07-24). Schema: event flag on flowers/NPCs, camera lock state, completion predicate (flower=color change; NPC=attach or flee), lock radius, multi-event ordering, placement tool in `level_editor.html`. Not in code yet. | 2026-07-24 | open — design + code TBD |
+| OQ7 | Narrative Event camera lock — flower=`event` flag + `f.used` resolves; NPC=`event` + `n.event_done` (set on wave hit) resolves. Camera caps `cam_y` at `ceiling - cam_dead`; player walks past freely. Level editor `level_editor.html` has Event Tag toggle. | 2026-07-28 | **resolved 2026-07-28** — shipped |
 | OQ8 | Level-editor enforcement: no flower within `steal_range=56` of Big spawn (Flower Flag 2 resolution). Add as validation rule in `level_editor.html`? | 2026-07-24 | open — editor change TBD |
 
 ## Resolved

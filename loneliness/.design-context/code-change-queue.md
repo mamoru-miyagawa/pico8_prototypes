@@ -17,7 +17,7 @@ Design decisions already made, awaiting code implementation. Each item: source (
 | # | Source | Decision | Change | Status |
 |---|--------|----------|--------|--------|
 | 6 | System 03 Flag 1 | Expose `post_steal` + `cast_t` as top-of-file tunables | Move hardcoded values to tunable declarations | open |
-| 7 | OQ7 | Narrative Event camera lock (new mechanic) | Schema: event flag on flowers/NPCs, camera lock state, completion predicate (flower=color change; NPC=attach or flee), lock radius, multi-event ordering, editor tool | open — design + code TBD |
+| 7 | OQ7 | Narrative Event camera lock (shipped) | `event` flag on flowers/NPCs; `update_camera` caps `cam_y` at `ceiling-cam_dead`; flower resolves on `f.used`, NPC on `n.event_done` (set in wave hit). Level editor has Event Tag toggle. No new tunables. | **done 2026-07-28** |
 
 ## Low priority
 

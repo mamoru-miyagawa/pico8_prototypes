@@ -86,3 +86,13 @@
 **Alternatives rejected:** Keep old GDD monolith — contradicts v2.2.0 wiki directive. Keep "How we verify" in pillars — v2.2.0 treats pillars as lenses, not hypotheses. Leave code queue in index — v2.2.0 bundle spec has it as own file.
 **Tensions:** none new.
 **Override:** none.
+
+## 2026-07-28 (10)
+**Decision:** Narrative Event mechanic implemented. Resolves OQ7.
+**Shape:** `event=true` flag on flowers and NPCs. In `update_camera`, per-frame scan finds the highest-world-y unresolved event in the top half (`-16 < sy < 64`) and caps `cam_y` at `ceiling - cam_dead`. Player walks past freely; world doesn't follow. Flower resolves on `f.used`. NPC resolves on `n.event_done` (set at the wave-hit site, so proximity-flee doesn't bypass the lock). Big NPC excluded.
+**Rationale:** 2026-07-24 (6) defined the mechanic abstractly; the predicate is "camera refuses to scroll past, player is never blocked." Initial implementation clamped `py` — that created an invisible wall at the event's y and felt like a collision, not a beat. Switching to a `cam_y` cap preserves the narrative stall without trapping the player.
+**Level editor:** `level_editor.html` gained an EVENT section with a single ON/OFF toggle (mirrors color/count pattern: updates selected entity with undo, or sets `curEvent` for next placement) and a small red 4×4 badge on flagged entities. `stateSnapshot`, `restoreState`, `expandPlants`, `generateLua`, `parseLua` all carry `event`. Export emits `,event=true` only when set. `-- editor:plants=` JSON metadata includes `event` so saved levels round-trip.
+**Alternatives rejected:** "Clamp `py`" — invisible wall, no narrative feel. "Freeze player entirely" — breaks P1 forward-only. "Soft visual gate only" — player can skip, undermines the beat. "Big NPC gets event too" — Big is a different mechanic (passive thief), not an interactible.
+**Tensions:** P1 ↔ stall. Resolved same as 2026-07-24 (6): stall is temporary, releases on resolution, never reverses.
+**Override:** user specified "interactibles (flowers, npcs)" → small NPCs only, Big excluded.
+**Raised:** none new.
