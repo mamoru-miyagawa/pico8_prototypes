@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "level_editor.html",
+  "entry": "level_editor.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-07-27T13:18:53.714Z",
+  "updatedAt": "2026-07-27T13:18:53.714Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}
