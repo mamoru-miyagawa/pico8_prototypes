@@ -61,8 +61,8 @@ function set_music_layers(att)
  end
 end
 
-pcol=6 -- start white; matching-color npcs attract, others flee
-glow_cols={[12]=1,[8]=2,[6]=13,[14]=2} -- [main]=outer glow color
+pcol=13 -- start white; matching-color npcs attract, others flee
+glow_cols={[12]=1,[8]=2,[13]=5,[14]=2} -- [main]=outer glow color
 pcol2=glow_cols[pcol] or pcol
 function set_player_color(c)
  if c==pcol then return end
@@ -228,7 +228,7 @@ if flower_charging then sfx(54) end
     local d=sqrt(dx*dx+dy*dy)
     if d<=call.r then
      call.hit[n]=true
-     if n.event then n.event_done=true spawn_next_chunk() end
+     if n.event and not n.event_done then n.event_done=true spawn_next_chunk() end
      if n.col==pcol then
       if not n.att then
        n.att=true n.att_fc=fc big.sc=0
@@ -268,7 +268,7 @@ if flower_charging then sfx(54) end
     else
     local dx,dy=px-n.x,py-n.y
     local d=sqrt(dx*dx+dy*dy)
-     if n.col!=pcol then -- non-matching color flees
+     if n.col!=pcol and (not n.event or n.event_done) then -- non-matching color flees (event npcs wait for call wave, resolved events flee normally)
        if not n.fleeing and d<flee_range and d>0.001 then
         n.fleeing=true
         local fx,fy=(n.x-px)/d,(n.y-py)/d
@@ -360,16 +360,16 @@ if flower_charging then sfx(54) end
         end
        end
       end
-     else
-      big.x+=big.fdx*big_retreat_sp
-      big.y+=big.fdy*big_retreat_sp
-      sfx(56)
-     if big.y-cam_y>144 or big.x<-16 or big.x>144 then
-      big.done=true
-      local was_event=big.event
-      for n in all(npcs) do if n.stolen then del(npcs,n) end end
-      big={done=true}
-      if was_event then spawn_next_chunk() end
+   else
+    big.x+=big.fdx*big_retreat_sp
+    big.y+=big.fdy*big_retreat_sp
+    sfx(56)
+    if big.y-cam_y>144 or big.x<-16 or big.x>144 then
+     big.done=true
+     local was_event=big.event
+     for n in all(npcs) do if n.stolen then del(npcs,n) end end
+     big={done=true}
+     if was_event then spawn_next_chunk() end
      end
     end
    end
@@ -378,7 +378,7 @@ if flower_charging then sfx(54) end
    big.jx=flr(rnd(3))-1
    big.jy=flr(rnd(3))-1
   end
- if state=="play" and fade_t<fade_in_f then fade_t+=1 end
+  if state=="play" and fade_t<fade_in_f then fade_t+=1 end
  for r in all(rings) do
   r.r+=r.vg or 1.5
   r.a-=1
@@ -635,28 +635,11 @@ end
  px=mid(corridor_l,px,corridor_r)
 end
 
--- editor:plants=[{"x":64,"y":-111,"col":12,"count":1,"event":true},{"x":30,"y":-48,"col":12,"count":3,"event":false},{"x":101,"y":-11,"col":12,"count":1,"event":false},{"x":42,"y":20,"col":12,"count":3,"event":false},{"x":77,"y":40,"col":12,"count":2,"event":false}]
--- npcs
-npcs={
- {x=64,y=-111,jx=0,jy=0,att=false,col=12,stolen=false,event=true},
- {x=30,y=-54,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=35,y=-45,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=25,y=-45,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=101,y=-11,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=42,y=14,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=47,y=23,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=37,y=23,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=77,y=34,jx=0,jy=0,att=false,col=12,stolen=false},
- {x=77,y=46,jx=0,jy=0,att=false,col=12,stolen=false},
-}
--- big npc: passive thief, steals attached npcs, retreats when att=0
-big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0,event=true}
-chunks={}
-next_chunk=1
+-- gated chunk spawn (defined here so re-export of the level data block below does not overwrite it)
 function spawn_next_chunk()
  local c=chunks[next_chunk]
  if c==nil then return end
- for n in all(c.npcs) do add(npcs,n) end
+ for n in all(c.npcs) do n.jx=n.jx or 0 n.jy=n.jy or 0 add(npcs,n) end
  for f in all(c.flowers) do add(flowers,f) end
  for g in all(c.grass) do add(grass,g) end
  if c.big then
@@ -665,16 +648,25 @@ function spawn_next_chunk()
  end
  next_chunk+=1
 end
--- grass tufts next to each spawner (sprite 7, world space, col 2 base glow)
+
+-- editor:plants=[{"x":49,"y":-282,"col":13,"count":1,"event":true}]
+-- npcs (initial block, exported top-level)
+npcs={
+ {x=49,y=-282,jx=0,jy=0,att=false,col=13,stolen=false,event=true},
+}
+-- big npc (initial block)
+big={done=true}
+-- grass tufts (initial block)
 grass={}
-grass[1]={x=64+12,y=-111}
-grass[2]={x=30+12,y=-48}
-grass[3]={x=101+12,y=-11}
-grass[4]={x=42+12,y=20}
-grass[5]={x=77+12,y=40}
--- flowers: sprite 9, world space, changes player color on hold x
+grass[1]={x=49+12,y=-282}
+-- flowers (initial block)
 flowers={
 }
+-- ヌ⬆️█ヌ⬆️█ additional chunks (gated sections, spawned on event resolve) ヌ⬆️█ヌ⬆️█
+chunks={}
+chunks[1]={npcs={{x=28,y=-460,col=13,event=false},{x=73,y=-548,col=12,event=false},{x=73,y=-536,col=12,event=false},{x=35,y=-641,col=12,event=false},{x=41,y=-635,col=12,event=false},{x=35,y=-629,col=12,event=false},{x=29,y=-635,col=12,event=false},{x=57,y=-395,col=13,event=false}},flowers={{x=49,y=-754,col=12,used=false,event=true}},grass={{x=40,y=-460},{x=85,y=-542},{x=47,y=-635},{x=69,y=-395}}}
+chunks[2]={npcs={{x=37,y=-867,col=12,event=false},{x=37,y=-855,col=12,event=false},{x=68,y=-963.5,col=12,event=false},{x=36,y=-1088.5,col=12,event=false}},grass={{x=49,y=-861.5},{x=80,y=-963.5},{x=48,y=-1088.5}}}
+next_chunk=1
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000b00000000000077000000000000000000000000000000000000000000000000000
 00000000700000070000000000000000070000700000000000000000b000030b0000000000777700000000000000000000000000000000000000000000000000

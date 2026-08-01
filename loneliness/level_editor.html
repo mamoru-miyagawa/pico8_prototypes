@@ -387,6 +387,12 @@ function setSection(idx) {
   draw();
   renderSections();
   updateSizeLabel();
+  if (idx === 0) scrollToPlayer();
+}
+function scrollToPlayer() {
+  const cont = document.getElementById('canvas-container');
+  const [, py] = w2c(64, 84);
+  cont.scrollTop = Math.max(0, py - cont.clientHeight * 0.3);
 }
 
 const w2c = (wx, wy) => [wx * scale, (wy - WORLD_TOP) * scale];
@@ -1038,7 +1044,7 @@ function generateLua() {
     let evStr = b.event ? ',event=true' : '';
     lines.push(`big={x=${b.x},y=${b.y},done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0${evStr}}`);
   } else {
-    lines.push('big={x=64,y=-260,done=false,retreat=false,engaged=false,sc=0,jx=0,jy=0,cast=false,cast_t=0,event=true}');
+    lines.push('big={done=true}');
   }
   lines.push('-- grass tufts (initial block)');
   lines.push('grass={}');
@@ -1060,6 +1066,7 @@ function generateLua() {
       let s = JSON.stringify(entry);
       s = s.replace(/"([a-zA-Z_]+)":/g, '$1=');
       s = s.replace(/"(true|false)"/g, '$1');
+      s = s.replace(/\[/g, '{').replace(/\]/g, '}');
       lines.push(`chunks[${i}]=${s}`);
     }
     lines.push('next_chunk=1');

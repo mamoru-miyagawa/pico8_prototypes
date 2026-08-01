@@ -574,3 +574,54 @@ Reference section — not features, but hard-won knowledge for future work.
   - sfx(53): appended to the call-wave init line. sfx(55): appended to the cast-ring spawn line. sfx(56): new line inside the retreat else. sfx(54): `if flower_charging then sfx(54) end` after the flower loop, before the movement gate.
   - PICO-8 can't halt a playing sfx mid-note, so the "re-trigger each frame" idiom gives loop-while-active / stop-on-release for 54 and 56 — they should be short sounds in the editor. Slots 53–56 follow the whole-tone scale (50–52 do).
 - **Tunables added:** none.
+
+## spawn_next_chunk Missing (post-session)
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Function was referenced 3× (flower absorb, NPC wave hit, Big despawn) but never defined; user hit nil error at line 228.
+- **What it does:** Originally thought to be a dropped edit. Root cause: the editor's export overwrites `loneliness.p8` from `-- editor:plants=` downward. The function had been added *after* that block, so the next export wiped it.
+- **How implemented:** Moved the function to `loneliness.p8:639-651`, just after `update_camera` and *above* the export target. Added `n.jx=n.jx or 0 n.jy=n.jy or 0` defaults inside the npc loop because the editor's chunk export omits those fields (only the initial block hardcodes them). One-line comment marks the spot as export-safe.
+- **Tunables added:** none.
+
+## Big NPC: nil arithmetic on frame 1
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Big's retreat movement was inside an `else` branch tied to `if big.post_steal then`, so it ran in the initial idle state with `big.fdx/big.fdy=nil` → runtime error halts `_update` mid-frame → `update_camera` never runs → camera can't ratchet → event NPC at y=-282 stays off-screen.
+- **What it does:** Restructured the Big update block (loneliness.p8:308-380) so the retreat movement is the proper `else` of `if not big.retreat` (line 312), not `if big.post_steal`. Movement now only runs when `big.retreat==true` and the direction vectors are guaranteed set. Static idle, cast, steal, and post_steal countdown are unaffected.
+- **How implemented:** Moved lines 363-373 (retreat movement + offscreen check) out of the `if not big.retreat` block into the new `else` of that same `if`. Added back one `end` that I'd dropped in the move (closes `if not big.done`). Indentation in the block is now drifted from the surrounding code; PICO-8 parses it fine, tidy when the block next gets rewritten.
+
+## Event NPC Proximity-Flee Override
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Event NPCs were being despawned by the non-matching-color proximity-flee rule before the player could resolve them with the call wave.
+- **What it does:** The event NPC at y=-282 (col=12) was fleeing upward at `flee_sp=1.4` as soon as the player approached — the camera lock on the Big at y=-260 put the player within `flee_range=24` of the NPC. NPC fled off the top of the world. Grass stayed put, so the user saw "vegetation but no NPC."
+- **How implemented:** `loneliness.p8:271` — added `and not n.event` to the flee gate. Event NPCs now wait for the call wave to hit (which sets `n.event_done=true` and triggers the chunk spawn). Non-event NPCs still flee on contact as before.
+
+## Level Editor Bug Fixes (post-session)
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Three editor bugs that broke export or made the visualizer unusable.
+- **What it does:**
+  1. Player marker was off-screen on initial load — canvas is 1440px tall (SEC0 range × scale 3) but viewport is 800-900px, so the marker at canvas y=1302 was below the fold. Fixed by adding `scrollToPlayer()` (line 390) called from `setSection(0)`. Scrolls so the marker sits ~30% from the top of the visible viewport.
+  2. Clearing the level and re-exporting still produced a hardcoded `big={...event=true}` default. Fixed by emitting `big={done=true}` (the sentinel) in the `else` branch (line 1047). Existing `not big.done` / `big.event` checks treat the sentinel as gone.
+  3. JSON array brackets in chunk export — `JSON.stringify` produced `npcs=[{...},{...}]` but PICO-8 Lua needs `{...}`. Fixed with `s.replace(/\[/g, '{').replace(/\]/g, '}')` (line 1069) after the existing object-key post-process. Round-trips with `parseLua` (which already uses `\{...\}` regex).
+- **How implemented:** All three are small targeted edits in `level_editor.html`. No structural changes.
+
+## White Color Standard Changed (per user request)
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Player's white color group changed from inner=6/outer=13 to inner=13/outer=5.
+- **What it does:** `pcol=13` (player starts white); `glow_cols[13]=5` (outer glow). No col=6 entities in the current level, so no entity changes needed.
+- **How implemented:** `loneliness.p8:64-65`. If the user wants white NPCs in the level, editor NPCs/flowers need `col=13` (not 6).
+
+## Narrative Event Gate Fixes + Matching-Color Onboarding
+- **Date:** 2026-08-01
+- **Status:** complete
+- **What it is:** Two gate bugs left event NPCs unresponsive after the call wave hit, plus level data with no matching-color NPCs for the starting white player.
+- **What it does:** Resolved event NPCs now behave like normal non-matching NPCs — after the wave hits them they flee and despawn (visible reaction; previously they froze in place forever, flagged fleeing but never moving). The wave hook no longer re-fires `spawn_next_chunk()` on later waves, so chunk gates can't be skipped. Event NPC (49,-282) and chunk-1 NPCs (57,-395)/(28,-460) flipped to col=13 so the first wave produces an attach, teaching the verb per GDD Player Journey.
+- **How implemented:**
+  - loneliness.p8:271 — flee gate `not n.event` → `(not n.event or n.event_done)`; resolved events flee normally.
+  - loneliness.p8:231 — wave hook `if n.event then` → `if n.event and not n.event_done then` (event_done is now the real gate per System 10).
+  - Data block: `-- editor:plants=` comment + initial npcs + 2 chunk-1 npcs → col=13. Six chunk-1 blues still flee by design; blue flower at -754 severs white bonds (designed identity cost) and unlocks chunk-2 blues. ⚠ editor re-export overwrites the data block — mirror colors in level_editor.html.
+  - Verified headless: Lua 5.4 sim port of call-wave / NPC-movement / camera / spawn logic — 11/11 assertions across real data + a col=12 mutant.
+- **Tunables added:** none.
