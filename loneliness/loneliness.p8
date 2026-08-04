@@ -224,27 +224,31 @@ if flower_charging then sfx(54) end
   call.r+=call_speed
   for n in all(npcs) do
    if not n.stolen and not call.hit[n] then
-    local dx,dy=px-n.x,py-n.y
-    local d=sqrt(dx*dx+dy*dy)
-    if d<=call.r then
-     call.hit[n]=true
-     if n.event and not n.event_done then n.event_done=true spawn_next_chunk() end
-     if n.col==pcol then
-      if not n.att then
-       n.att=true n.att_fc=fc big.sc=0
-       add(rings,{r=8,a=12})
-       sfx(51) --attach chime
-       local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
-       set_music_layers(att)
+    -- only hit npcs visible on screen (+margin)
+    local nsy=n.y-cam_y
+    if nsy>-24 and nsy<152 then
+     local dx,dy=px-n.x,py-n.y
+     local d=sqrt(dx*dx+dy*dy)
+     if d<=call.r then
+      call.hit[n]=true
+      if n.event and not n.event_done then n.event_done=true spawn_next_chunk() end
+      if n.col==pcol then
+       if not n.att then
+        n.att=true n.att_fc=fc big.sc=0
+        add(rings,{r=8,a=12})
+        sfx(51) --attach chime
+        local att=0 for m in all(npcs) do if m.att and not m.stolen then att+=1 end end
+        set_music_layers(att)
+       end
+      elseif not n.fleeing and d>0.001 then
+       n.fleeing=true
+       local fx,fy=(n.x-px)/d,(n.y-py)/d
+       if fy<0 and abs(fx)<0.001 then fx=1 end
+       local fl=sqrt(fx*fx+fy*fy)
+       if fl>0.001 then fx=fx/fl fy=fy/fl end
+       n.fdx=fx n.fdy=fy
+       sfx(52)
       end
-     elseif not n.fleeing and d>0.001 then
-      n.fleeing=true
-      local fx,fy=(n.x-px)/d,(n.y-py)/d
-      if fy<0 and abs(fx)<0.001 then fx=1 end
-      local fl=sqrt(fx*fx+fy*fy)
-      if fl>0.001 then fx=fx/fl fy=fy/fl end
-      n.fdx=fx n.fdy=fy
-      sfx(52)
      end
     end
    end
@@ -649,10 +653,10 @@ function spawn_next_chunk()
  next_chunk+=1
 end
 
--- editor:plants=[{"x":49,"y":-282,"col":13,"count":1,"event":true}]
+-- editor:plants=[{"x":49,"y":-282,"col":12,"count":1,"event":true}]
 -- npcs (initial block, exported top-level)
 npcs={
- {x=49,y=-282,jx=0,jy=0,att=false,col=13,stolen=false,event=true},
+ {x=49,y=-282,jx=0,jy=0,att=false,col=12,stolen=false,event=true},
 }
 -- big npc (initial block)
 big={done=true}
@@ -664,8 +668,8 @@ flowers={
 }
 -- ヌ⬆️█ヌ⬆️█ additional chunks (gated sections, spawned on event resolve) ヌ⬆️█ヌ⬆️█
 chunks={}
-chunks[1]={npcs={{x=28,y=-460,col=13,event=false},{x=73,y=-548,col=12,event=false},{x=73,y=-536,col=12,event=false},{x=35,y=-641,col=12,event=false},{x=41,y=-635,col=12,event=false},{x=35,y=-629,col=12,event=false},{x=29,y=-635,col=12,event=false},{x=57,y=-395,col=13,event=false}},flowers={{x=49,y=-754,col=12,used=false,event=true}},grass={{x=40,y=-460},{x=85,y=-542},{x=47,y=-635},{x=69,y=-395}}}
-chunks[2]={npcs={{x=37,y=-867,col=12,event=false},{x=37,y=-855,col=12,event=false},{x=68,y=-963.5,col=12,event=false},{x=36,y=-1088.5,col=12,event=false}},grass={{x=49,y=-861.5},{x=80,y=-963.5},{x=48,y=-1088.5}}}
+chunks[1]={npcs={{x=31,y=-517,col=12,event=false},{x=77,y=-591,col=12,event=false},{x=82,y=-582,col=12,event=false},{x=72,y=-582,col=12,event=false},{x=27,y=-645,col=12,event=false},{x=27,y=-633,col=12,event=false},{x=77,y=-717,col=12,event=false},{x=30,y=-786,col=12,event=false},{x=30,y=-774,col=12,event=false}},flowers={{x=50,y=-871.5,col=12,used=false,event=true}},grass={{x=43,y=-517},{x=89,y=-585},{x=39,y=-639},{x=89,y=-717},{x=42,y=-780}}}
+chunks[2]={npcs={{x=27,y=-1038.25,col=12,event=false},{x=75,y=-1127.25,col=12,event=false},{x=36,y=-1249,col=12,event=false},{x=36,y=-1237,col=12,event=false}},grass={{x=39,y=-1038.25},{x=87,y=-1127.25},{x=48,y=-1243.25}}}
 next_chunk=1
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000b00000000000077000000000000000000000000000000000000000000000000000
