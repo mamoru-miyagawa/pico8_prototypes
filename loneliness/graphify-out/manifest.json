@@ -1,0 +1,302 @@
+{
+  ".obsidian/.obsidian/app.json": {
+    "mtime": 1785495368.8157566,
+    "ast_hash": "99914b932bd37a50b983c5e7c90ae93b",
+    "semantic_hash": ""
+  },
+  ".obsidian/.obsidian/appearance.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "99914b932bd37a50b983c5e7c90ae93b",
+    "semantic_hash": ""
+  },
+  ".obsidian/.obsidian/core-plugins.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "7c877bea49eaeabb100563bd157b9051",
+    "semantic_hash": ""
+  },
+  ".obsidian/.obsidian/workspace.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "54b60f11d8a979966afd43ea1f3f946b",
+    "semantic_hash": ""
+  },
+  ".obsidian/app.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "99914b932bd37a50b983c5e7c90ae93b",
+    "semantic_hash": ""
+  },
+  ".obsidian/appearance.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "86d9f6137e6a7f85b82e26b03cbcde9d",
+    "semantic_hash": ""
+  },
+  ".obsidian/core-plugins.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "7c877bea49eaeabb100563bd157b9051",
+    "semantic_hash": ""
+  },
+  ".obsidian/workspace.json": {
+    "mtime": 1785495368.8157861,
+    "ast_hash": "0215e0f70a5af8f31be29e6e724bec36",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/open-design.json": {
+    "mtime": 1785495368.8160465,
+    "ast_hash": "0692f911b472e80e92106b4ac09e3d1a",
+    "semantic_hash": ""
+  },
+  "hotaru.js": {
+    "mtime": 1785495368.8206081,
+    "ast_hash": "e4a37a6b9b676206ceacdf5d51bd4791",
+    "semantic_hash": ""
+  },
+  "level_editor.html.artifact.json": {
+    "mtime": 1785495368.8206081,
+    "ast_hash": "b55b5bd13c4102596cc7213773b19e19",
+    "semantic_hash": ""
+  },
+  "opencode.json": {
+    "mtime": 1785495368.821608,
+    "ast_hash": "532aff05853f732eacbe1c0a75ba8b87",
+    "semantic_hash": ""
+  },
+  "soundtrack.lua": {
+    "mtime": 1785495368.821608,
+    "ast_hash": "0ea02c257751f6fd5f0d6cd1614f57e7",
+    "semantic_hash": ""
+  },
+  ".claude/devlog.md": {
+    "mtime": 1785555295.1048121,
+    "ast_hash": "d729263b3bc350539311136fd7531371",
+    "semantic_hash": ""
+  },
+  ".claude/skills/devlog/SKILL.md": {
+    "mtime": 1785495368.8146422,
+    "ast_hash": "2e43f7c9e2c9fae65376b403d160305c",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/SKILL.md": {
+    "mtime": 1785555263.9779975,
+    "ast_hash": "1c6b66729015e5d60e6c9b6f4ea0ba8b",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/assets/obsidian-vault-layout.md": {
+    "mtime": 1785555263.978067,
+    "ast_hash": "862b42117c86ec8829835f0ef2ed8502",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/domains/TEMPLATE.md": {
+    "mtime": 1785555263.9781454,
+    "ast_hash": "38bc94613e86982d074db5d64d68e2f4",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/failure-modes.md": {
+    "mtime": 1785555263.9781942,
+    "ast_hash": "b2dd100d5a7594d05b518fd6d6b1e943",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/flowcharts.md": {
+    "mtime": 1785555263.978249,
+    "ast_hash": "23c7e3b4922749a03b39966e6fcb4e95",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/pillars-reference.md": {
+    "mtime": 1785555263.9782748,
+    "ast_hash": "74540e4c9feb7b54598fd59f108d3fee",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/GDD-skeleton.md": {
+    "mtime": 1785555263.9783072,
+    "ast_hash": "c43a4283ddce5601b1ea8d005bd30277",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/balance-table.md": {
+    "mtime": 1785555263.978344,
+    "ast_hash": "0ceaff052eafd84e3d3f17b30a13764f",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/core-loop-canvas.md": {
+    "mtime": 1785555263.978375,
+    "ast_hash": "0ec12b34214a45ef2ec9add616df43a0",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/mda-reference.md": {
+    "mtime": 1785555263.9784017,
+    "ast_hash": "00473fc35f47a157e54c92f36bacbf20",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/project-context.md": {
+    "mtime": 1785555263.9784281,
+    "ast_hash": "bd5930a8c36e729a3bc76fa02cbb1fbd",
+    "semantic_hash": ""
+  },
+  ".claude/skills/gdd-toolkit/references/templates/system-design.md": {
+    "mtime": 1785555263.978463,
+    "ast_hash": "9430dfedf435d080f8658c16818a58ea",
+    "semantic_hash": ""
+  },
+  ".claude/skills/loneliness/SKILL.md": {
+    "mtime": 1785495368.8146422,
+    "ast_hash": "d270f368615205574e42273ed088e68f",
+    "semantic_hash": ""
+  },
+  ".claude/skills/pico-8/SKILL.md": {
+    "mtime": 1785495368.8146422,
+    "ast_hash": "f452f385fdb501137ddc35690dd350ae",
+    "semantic_hash": ""
+  },
+  ".design-context/code-change-queue.md": {
+    "mtime": 1785495368.8146422,
+    "ast_hash": "a29b7d3115a8cfff1f914918ef740a9b",
+    "semantic_hash": ""
+  },
+  ".design-context/core-loop.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "1127e201d084e5e2efd42970ce0ebce7",
+    "semantic_hash": ""
+  },
+  ".design-context/design-log.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "55d354f52bc143ab343e3dc63b1fb15b",
+    "semantic_hash": ""
+  },
+  ".design-context/index.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "f414b83f967b31f6c1200e87e766f08e",
+    "semantic_hash": ""
+  },
+  ".design-context/mda-analyses/core-loop.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "5a6a1f85a240c371b652d476e18da24d",
+    "semantic_hash": ""
+  },
+  ".design-context/open-questions.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "9c1864411ee43df0cefb250a87724b16",
+    "semantic_hash": ""
+  },
+  ".design-context/pairwise-matrix.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "e89f37a90a0ee747eed1a74c17c10025",
+    "semantic_hash": ""
+  },
+  ".design-context/pillars.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "81bfc02e7bc436da6e31d655e51753c7",
+    "semantic_hash": ""
+  },
+  ".design-context/rejected-ideas.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "5dc88bc9414fc97ec00697eec75cefa4",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/01-movement-camera.md": {
+    "mtime": 1785495368.8148594,
+    "ast_hash": "421c1814ff651f07feba2c533f965451",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/02-call-wave-attach.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "cc313944f2b73b86253efc308af072b5",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/03-big-npc-thief.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "6d81b3530255e8cc0130a5d2a3b60d25",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/04-flower-color-change.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "00d941eb73e5f2a0b896b52847ea91b1",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/05-pollen-ambient.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "93501b2eeead205a263fb4f4c03fd862",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/06-dynamic-soundtrack.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "848181e27b84f1239ca1aac7dbe91ccd",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/07-grass-flower-visual.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "2b6e7e747e6b17a85bbca1271d8f2af5",
+    "semantic_hash": ""
+  },
+  ".design-context/systems/08-splash-intro-fadein.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "36d32688b1e778aa1d96197ba4156e56",
+    "semantic_hash": ""
+  },
+  ".design-context/tensions.md": {
+    "mtime": 1785495368.8152726,
+    "ast_hash": "b59011173363ab1f6324e867c09203ba",
+    "semantic_hash": ""
+  },
+  ".od-skills/agent-browser-e23dc86844/SKILL.md": {
+    "mtime": 1785495368.8159401,
+    "ast_hash": "ad54f0658327942d80a10b0822864e9a",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/SKILL.md": {
+    "mtime": 1785495368.8159401,
+    "ast_hash": "16c786337dbf32f76c2d7494433e1240",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/assets/template.html": {
+    "mtime": 1785495368.8160465,
+    "ast_hash": "cf3c42f3762f84d07c55f5d8bac2c15c",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/example.html": {
+    "mtime": 1785495368.8160465,
+    "ast_hash": "66d212e7904786f439d5acd3ee802015",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/references/checklist.md": {
+    "mtime": 1785495368.8160465,
+    "ast_hash": "60afa910de58fd0b4a14edb01d076c5e",
+    "semantic_hash": ""
+  },
+  ".od-skills/web-prototype-5e05b1e1cc/references/layouts.md": {
+    "mtime": 1785495368.8162444,
+    "ast_hash": "ae64298fd39a7040644945c904c6fc98",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1785495368.8162444,
+    "ast_hash": "fec511fee92f18313d37fb8c082ff8a4",
+    "semantic_hash": ""
+  },
+  "GDD.md": {
+    "mtime": 1785495368.8162444,
+    "ast_hash": "f2d06d35cb02470b05b4e99fa310613a",
+    "semantic_hash": ""
+  },
+  "HANDOVER.md": {
+    "mtime": 1785554639.5044477,
+    "ast_hash": "9746e3c182b9a3ddd42abbeeaa7cf607",
+    "semantic_hash": ""
+  },
+  "hotaru.html": {
+    "mtime": 1785495368.8162444,
+    "ast_hash": "40eed545653d3fda53fee7e0472ef526",
+    "semantic_hash": ""
+  },
+  "level_editor.html": {
+    "mtime": 1785551445.3467944,
+    "ast_hash": "e5d0aebd897fe0b31c5cfa7428eb8174",
+    "semantic_hash": ""
+  },
+  "musicmachine-0.p8.png": {
+    "mtime": 1785495368.821608,
+    "ast_hash": "679091b7c81647476ca2ed4f30e825c1",
+    "semantic_hash": ""
+  },
+  "spritesheet.png": {
+    "mtime": 1785495368.821608,
+    "ast_hash": "9bde4d83d8d27ada8f40c12778f1d704",
+    "semantic_hash": ""
+  }
+}
